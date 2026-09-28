@@ -37,13 +37,16 @@
     return match ? match[1] : '';
   }
 
-  async function api(ctx, path, params = {}) {
+  async function api(ctx, path, params = {}, options = {}) {
     const url = new URL(ctx.apiBase + path);
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, String(value)));
     const response = await fetch(url, { credentials: 'include', redirect: 'follow' });
     if (!response.ok) throw new Error('请求失败（HTTP ' + response.status + '）');
     const data = await response.json().catch(() => { throw new Error('登录已失效或接口没有返回课程数据'); });
-    if (Number(data.code) !== 0 && Number(data.code) !== 200) throw new Error(data.msg || '平台暂未开放此内容');
+    if (Number(data.code) !== 0 && Number(data.code) !== 200) {
+      const partial = data.data && typeof data.data === 'object' && Object.keys(data.data).length > 0;
+      if (!(options.allowPartial && partial)) throw new Error(data.msg || '平台接口未返回可用数据');
+    }
     return data;
   }
 
@@ -66,7 +69,7 @@
     return { title: String(course.title || '未命名课程'), teacher: String(course.realname || ''), lectures };
   }
 
-  function selectVideo(data) {
+  function selectVideo(data, options = {}) {
     const info = data.data || {};
     const candidates = [];
     for (const entry of Object.values(info.video_list || {})) {
@@ -78,7 +81,9 @@
       if (typeof candidate !== 'string') continue;
       try {
         const url = new URL(candidate);
-        if (url.protocol === 'https:' && /\.mp4$/i.test(url.pathname)) return { url: candidate, now: Number(info.now || info.content?.now) || null };
+        if (url.protocol === 'https:' && (/\.mp4$/i.test(url.pathname) || (options.allowAnyNested && candidate === info.content?.playback?.url))) {
+          return { url: candidate, now: Number(info.now || info.content?.now) || null };
+        }
       } catch { /* Try the next source. */ }
     }
     return null;

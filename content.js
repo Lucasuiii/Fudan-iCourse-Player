@@ -85,8 +85,7 @@
       $('.icp-course-title').textContent = state.course.title;
       $('.icp-teacher').textContent = state.course.teacher;
       renderList();
-      const count = state.course.lectures.filter((item) => item.available).length;
-      status('已找到 ' + state.course.lectures.length + ' 节课，其中 ' + count + ' 节已开放播放。');
+      status('已找到 ' + state.course.lectures.length + ' 节课。选择课次后将依次尝试参考项目的视频地址来源。');
     } catch (error) {
       status('无法读取课程：' + error.message + '。请检查登录状态和课程权限。', true);
     } finally {
@@ -102,12 +101,11 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'icp-lecture';
-      button.disabled = !lecture.available;
       button.classList.toggle('icp-active', state.current?.id === lecture.id);
       const name = document.createElement('strong');
       name.textContent = lecture.title;
       const meta = document.createElement('span');
-      meta.textContent = lecture.date + (lecture.available ? ' · 可播放' : ' · 暂未开放');
+      meta.textContent = lecture.date + (lecture.available ? ' · 已标记录播' : ' · 可尝试获取视频');
       button.append(name, meta);
       button.addEventListener('click', () => playLecture(lecture));
       list.append(button);
@@ -136,7 +134,6 @@
   }
 
   async function playLecture(lecture) {
-    if (!lecture.available) return;
     resetVideo();
     state.live = false;
     $('.icp-go-live').hidden = true;
@@ -148,14 +145,24 @@
     $('.icp-date').textContent = lecture.date;
     status('正在获取视频地址…');
     try {
-      const [sub, userResult] = await Promise.all([
-        core.api(ctx, '/courseapi/v3/portal-home-setting/get-sub-info', { course_id: state.courseId, sub_id: lecture.id }),
-        core.api(ctx, '/userapi/v1/infosimple')
-      ]);
+      let sub = null;
+      try {
+        sub = await core.api(ctx, '/courseapi/v3/portal-home-setting/get-sub-info',
+          { course_id: state.courseId, sub_id: lecture.id }, { allowPartial: true });
+      } catch { /* Match the reference client's get-sub-detail fallback. */ }
       if (state.current !== lecture) return;
-      const source = core.selectVideo(sub);
-      if (!source) throw new Error('这节课没有已开放的 MP4 视频');
-      const signed = core.signVideo(source.url, userResult.params || userResult.data || {}, source.now || undefined);
+      let source = core.selectVideo(sub || { data: {} });
+      const infoNow = Number(sub?.data?.now || sub?.data?.content?.now) || null;
+      if (!source) {
+        const detail = await core.api(ctx, '/courseapi/v3/multi-search/get-sub-detail',
+          { course_id: state.courseId, sub_id: lecture.id });
+        if (state.current !== lecture) return;
+        source = core.selectVideo(detail, { allowAnyNested: true });
+      }
+      if (!source) throw new Error('这节课没有可用的 MP4 地址');
+      const userResult = await core.api(ctx, '/userapi/v1/infosimple');
+      if (state.current !== lecture) return;
+      const signed = core.signVideo(source.url, userResult.params || userResult.data || {}, source.now || infoNow || undefined);
       video.src = ctx.vpn ? core.vpnUrl(signed) : signed;
       video.playbackRate = Number($('.icp-speed').value);
       $('.icp-placeholder').hidden = true;

@@ -16,8 +16,8 @@
 
 ## 实现与数据
 
-- 课程列表沿用参考项目的 `/courseapi/v3/multi-search/get-course-detail`，仅允许选择 `playback_status == 1` 的课次。
-- 视频沿用 `/courseapi/v3/portal-home-setting/get-sub-info`、`/userapi/v1/infosimple` 和相同的 `clientUUID`、`t` 签名方式。平台接口拒绝或视频未开放时，播放器会提示错误，不读取未开放内容的备用字段。
+- 课程列表沿用参考项目的 `/courseapi/v3/multi-search/get-course-detail`。所有课次均可尝试播放，列表会标示平台的 `playback_status`。
+- 视频沿用参考项目的顺序：先查询 `/courseapi/v3/portal-home-setting/get-sub-info`，依次尝试 `video_list[*].preview_url`、`playurl[*]`、`content.playback.url`；仍没有地址时再查询 `/courseapi/v3/multi-search/get-sub-detail` 的 `content.playback.url`。`get-sub-info` 返回非零代码但附带数据时，仍检查该数据。取得地址后使用 `/userapi/v1/infosimple` 的账户信息生成相同的 `clientUUID`、`t` 参数。
 - 字幕来自 `/courseapi/v3/web-socket/search-trans-result`，仅在页面内临时生成 WebVTT。
 - 本地只保存课程 ID 与课次对应的播放进度。视频、字幕、账号和直播地址不会被持久保存；关闭播放器时视频暂停。
 
