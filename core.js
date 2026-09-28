@@ -101,5 +101,27 @@
     return url.toString();
   }
 
-  root.ICourseCore = { context, vpnUrl, courseIdFromUrl, api, parseCourse, selectVideo, signVideo };
+  function subtitleCues(data) {
+    const segments = data?.list?.[0]?.all_content;
+    if (!Array.isArray(segments)) return [];
+    return segments.map((segment) => ({
+      start: Number(segment.BeginSec),
+      end: Number(segment.EndSec),
+      text: String(segment.Text || '').replace(/\s+/g, ' ').trim()
+    })).filter((cue) => Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.start >= 0 && cue.end > cue.start && cue.text)
+      .sort((a, b) => a.start - b.start);
+  }
+
+  function subtitleVtt(cues) {
+    const stamp = (seconds) => {
+      const ms = Math.round(seconds * 1000);
+      const hours = Math.floor(ms / 3600000);
+      const minutes = Math.floor(ms / 60000) % 60;
+      const secs = Math.floor(ms / 1000) % 60;
+      return [hours, minutes, secs].map((value) => String(value).padStart(2, '0')).join(':') + '.' + String(ms % 1000).padStart(3, '0');
+    };
+    return 'WEBVTT\n\n' + cues.map((cue) => stamp(cue.start) + ' --> ' + stamp(cue.end) + '\n' + cue.text.replace(/-->/g, '→').replace(/[<>]/g, '') + '\n').join('\n');
+  }
+
+  root.ICourseCore = { context, vpnUrl, courseIdFromUrl, api, parseCourse, selectVideo, signVideo, subtitleCues, subtitleVtt };
 })(globalThis);
