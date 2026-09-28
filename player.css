@@ -1,0 +1,62 @@
+#icp-launcher, #icp-panel { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; box-sizing: border-box; }
+#icp-launcher *, #icp-panel * { box-sizing: border-box; }
+#icp-launcher[hidden], #icp-panel[hidden], #icp-panel [hidden] { display: none !important; }
+#icp-launcher { position: fixed; z-index: 2147483646; right: 24px; bottom: 24px; padding: 13px 18px; border: 1px solid #304a9e; border-radius: 999px; background: #142b79; color: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 12px 32px #0c1c5060; cursor: pointer; }
+#icp-launcher:hover { background: #2644a3; }
+#icp-panel { position: fixed; z-index: 2147483647; inset: 0; display: grid; place-items: center; padding: 18px; background: #07122bbd; color: #152037; font-size: 14px; line-height: 1.45; }
+#icp-panel button, #icp-panel input, #icp-panel select { font: inherit; }
+#icp-panel button { cursor: pointer; }
+#icp-panel button:focus-visible, #icp-panel input:focus-visible, #icp-panel select:focus-visible { outline: 3px solid #70a7ff; outline-offset: 2px; }
+#icp-panel .icp-shell { display: flex; flex-direction: column; width: min(1280px, 100%); height: min(850px, 100%); min-height: 450px; overflow: hidden; border: 1px solid #d7dfed; border-radius: 20px; background: #f7f9fc; box-shadow: 0 28px 90px #0007; }
+#icp-panel .icp-header { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px 25px; background: #fff; border-bottom: 1px solid #e5eaf2; }
+#icp-panel .icp-header small { color: #5773ad; font-size: 10px; font-weight: 800; letter-spacing: 2px; }
+#icp-panel .icp-header h2 { margin: 2px 0 0; color: #102052; font-size: 23px; line-height: 1.2; }
+#icp-panel .icp-close { width: 38px; height: 38px; border: 0; border-radius: 10px; background: #edf1f7; color: #32415d; font-size: 26px; line-height: 1; }
+#icp-panel .icp-close:hover { background: #dfe6f2; }
+#icp-panel .icp-topbar { display: flex; align-items: end; gap: 10px; padding: 14px 25px 10px; background: #fff; }
+#icp-panel .icp-topbar label { display: grid; gap: 4px; color: #52617e; font-size: 12px; font-weight: 700; }
+#icp-panel .icp-course-id { width: min(310px, 50vw); height: 38px; padding: 0 12px; border: 1px solid #cbd5e4; border-radius: 8px; background: #fff; color: #172341; font-size: 14px; }
+#icp-panel .icp-load { height: 38px; padding: 0 16px; border: 0; border-radius: 8px; background: #2755c8; color: #fff; font-weight: 700; }
+#icp-panel .icp-load:hover { background: #1b44af; }
+#icp-panel .icp-load:disabled { opacity: .55; cursor: wait; }
+#icp-panel .icp-livebar { display: flex; align-items: end; gap: 10px; padding: 0 25px 9px; background: #fff; }
+#icp-panel .icp-livebar label { display: grid; gap: 4px; color: #52617e; font-size: 12px; font-weight: 700; }
+#icp-panel .icp-live-url { width: min(400px, 45vw); height: 36px; padding: 0 11px; border: 1px solid #cbd5e4; border-radius: 8px; color: #172341; }
+#icp-panel .icp-live-open { height: 36px; padding: 0 13px; border: 1px solid #c7d6f6; border-radius: 8px; background: #eaf1ff; color: #244caa; font-weight: 700; }
+#icp-panel .icp-live-open:hover { background: #dce9ff; }
+#icp-panel .icp-livebar span { padding-bottom: 9px; color: #8b96a8; font-size: 11px; }
+#icp-panel .icp-status { min-height: 35px; margin: 0; padding: 4px 25px 9px; border-bottom: 1px solid #e5eaf2; background: #fff; color: #45618e; font-size: 12px; }
+#icp-panel .icp-status.icp-error { color: #ab3442; }
+#icp-panel .icp-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); flex: 1; min-height: 0; }
+#icp-panel .icp-sidebar { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid #e2e7f0; background: #fff; }
+#icp-panel .icp-course { display: grid; gap: 3px; padding: 19px 17px 12px; }
+#icp-panel .icp-course strong { color: #152956; font-size: 16px; }
+#icp-panel .icp-course span { color: #77849a; font-size: 12px; }
+#icp-panel .icp-filter { height: 36px; margin: 0 16px 11px; padding: 0 11px; border: 1px solid #d9e0ec; border-radius: 8px; background: #f8fafd; color: #172341; }
+#icp-panel .icp-list { flex: 1; min-height: 0; overflow: auto; padding: 0 8px 14px; }
+#icp-panel .icp-lecture { display: grid; width: 100%; gap: 5px; margin: 3px 0; padding: 11px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #1b2b49; text-align: left; }
+#icp-panel .icp-lecture:hover:not(:disabled) { background: #edf3ff; }
+#icp-panel .icp-lecture.icp-active { border-color: #b9cdfc; background: #eaf1ff; }
+#icp-panel .icp-lecture:disabled { color: #8a95a7; cursor: not-allowed; }
+#icp-panel .icp-lecture strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+#icp-panel .icp-lecture span { color: #7b889e; font-size: 11px; }
+#icp-panel .icp-empty { padding: 20px 10px; color: #8994a6; text-align: center; }
+#icp-panel .icp-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 18px; }
+#icp-panel .icp-stage { position: relative; display: grid; place-items: center; flex: 1; min-height: 210px; overflow: hidden; border-radius: 14px; background: #0b1020; }
+#icp-panel .icp-video { width: 100%; height: 100%; max-height: 100%; background: #0b1020; }
+#icp-panel .icp-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #f1f4fc; pointer-events: none; }
+#icp-panel .icp-placeholder span { display: grid; place-items: center; width: 80px; height: 80px; padding-left: 4px; border: 1px solid #688bd388; border-radius: 50%; background: #3259a84f; font-size: 34px; }
+#icp-panel .icp-placeholder strong { font-size: 18px; }
+#icp-panel .icp-placeholder small { color: #9daece; }
+#icp-panel .icp-now { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 15px 3px 12px; }
+#icp-panel .icp-now div { display: grid; gap: 3px; }
+#icp-panel .icp-now small { color: #7c8ba4; font-size: 11px; }
+#icp-panel .icp-now strong { color: #14254b; font-size: 16px; }
+#icp-panel .icp-date { flex: none; color: #8190a5; font-size: 12px; }
+#icp-panel .icp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#icp-panel .icp-tools button, #icp-panel .icp-tools label { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 36px; padding: 0 12px; border: 1px solid #d4deee; border-radius: 8px; background: #fff; color: #25416d; font-size: 12px; font-weight: 700; }
+#icp-panel .icp-tools button:hover { background: #edf3ff; }
+#icp-panel .icp-speed { border: 0; background: transparent; color: #25416d; font-size: 12px; font-weight: 700; }
+#icp-panel .icp-hint { margin-top: 11px; color: #8290a4; font-size: 11px; }
+#icp-panel .icp-stage:fullscreen { border-radius: 0; }
+@media (max-width: 750px) { #icp-panel { padding: 0; } #icp-panel .icp-shell { width: 100%; height: 100%; border-radius: 0; } #icp-panel .icp-livebar { flex-wrap: wrap; } #icp-panel .icp-livebar span { display: none; } #icp-panel .icp-live-url { width: min(400px, 62vw); } #icp-panel .icp-layout { display: flex; flex-direction: column-reverse; overflow: auto; } #icp-panel .icp-sidebar { min-height: 180px; max-height: 280px; border-top: 1px solid #e2e7f0; border-right: 0; } #icp-panel .icp-main { min-height: 340px; } #icp-panel .icp-stage { min-height: 190px; } #icp-panel .icp-hint { display: none; } }
