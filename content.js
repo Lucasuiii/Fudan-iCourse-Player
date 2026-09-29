@@ -23,7 +23,7 @@
       <p class="icp-status" role="status">在 iCourse 登录后输入课程 ID，或从课程页面自动识别。</p>
       <div class="icp-layout">
         <aside class="icp-sidebar"><div class="icp-course"><small>当前课程</small><strong class="icp-course-title">尚未选择课程</strong><span class="icp-teacher"></span></div><div class="icp-tabs" role="tablist" aria-label="侧栏"><button class="icp-tab icp-tab-active" type="button" data-tab="lectures" role="tab" aria-selected="true">课次</button><button class="icp-tab" type="button" data-tab="transcript" role="tab" aria-selected="false">逐句字幕</button></div><div class="icp-lectures-pane"><input class="icp-filter" placeholder="搜索课次" aria-label="搜索课次"><div class="icp-list" aria-label="课次列表"></div></div><div class="icp-transcript-pane" hidden><p class="icp-transcript-empty">选择课次后读取官方字幕</p><div class="icp-transcript-list"></div></div></aside>
-        <main class="icp-main"><div class="icp-stage"><video class="icp-video" controls playsinline preload="metadata"></video><div class="icp-placeholder"><span>▶</span><strong>选择一节课次，开始观看</strong><small>你的课程 · 更舒服的播放体验</small></div></div>
+        <main class="icp-main"><div class="icp-stage"><video class="icp-video" controls playsinline preload="metadata"></video><div class="icp-placeholder"><span>▶</span><strong>选择一节课次，开始观看</strong><small>你的课程 · 更舒服的播放体验</small></div><div class="icp-tap-target" role="button" tabindex="0" aria-label="点击暂停或继续播放"></div></div>
           <div class="icp-now"><div><small>当前课次</small><strong class="icp-now-title">等待选择课次</strong></div><span class="icp-date"></span></div>
           <div class="icp-tools"><div class="icp-toolgroup"><button class="icp-back" type="button" title="后退 10 秒">↶ <span>10 秒</span></button><button class="icp-forward" type="button" title="前进 10 秒"><span>10 秒</span> ↷</button><button class="icp-go-live" type="button" hidden>● 回到直播</button></div><div class="icp-toolgroup"><label>速度 <select class="icp-speed"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option><option value="2.5">2.5×</option><option value="3">3×</option></select></label><button class="icp-captions" type="button" aria-pressed="true" disabled>字幕：读取中</button><button class="icp-denoise" type="button" aria-pressed="false">轻度降噪：关</button><button class="icp-pip" type="button">画中画</button><button class="icp-full" type="button">全屏</button></div></div>
           <div class="icp-hint">空格播放/暂停 · ←/→ 快退/快进 · F 全屏 · P 画中画 · C 字幕 · 降噪默认关闭</div>
@@ -37,9 +37,25 @@
   const input = $('.icp-course-id');
   const list = $('.icp-list');
   const filter = $('.icp-filter');
+  const stage = $('.icp-stage');
+  function fitStage() {
+    if (panel.hidden || document.fullscreenElement) return;
+    const main = $('.icp-main');
+    const style = getComputedStyle(main);
+    const availableWidth = main.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const controlsHeight = $('.icp-now').offsetHeight + $('.icp-tools').offsetHeight + $('.icp-hint').offsetHeight + 9;
+    const availableHeight = main.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - controlsHeight;
+    if (availableWidth > 0 && availableHeight > 0) stage.style.width = Math.floor(Math.min(availableWidth, Math.max(190, availableHeight) * 16 / 9)) + 'px';
+  }
+  const stageObserver = new ResizeObserver(fitStage);
+  for (const element of [$('.icp-main'), $('.icp-now'), $('.icp-tools')]) stageObserver.observe(element);
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) stage.style.width = '';
+    else fitStage();
+  });
   panel.querySelectorAll('.icp-tab').forEach((button) => button.addEventListener('click', () => showTab(button.dataset.tab)));
   input.value = core.courseIdFromUrl(location.href);
-  launcher.addEventListener('click', () => { panel.hidden = false; launcher.hidden = true; if (input.value && !state.course) loadCourse(); });
+  launcher.addEventListener('click', () => { panel.hidden = false; launcher.hidden = true; fitStage(); if (input.value && !state.course) loadCourse(); });
   $('.icp-close').addEventListener('click', close);
   panel.addEventListener('click', (event) => { if (event.target === panel) close(); });
   $('.icp-load').addEventListener('click', loadCourse);
@@ -54,6 +70,14 @@
   $('.icp-full').addEventListener('click', toggleFullscreen);
   $('.icp-captions').addEventListener('click', toggleCaptions);
   $('.icp-denoise').addEventListener('click', toggleDenoise);
+  $('.icp-tap-target').addEventListener('click', togglePlayback);
+  $('.icp-tap-target').addEventListener('keydown', (event) => { if (event.key === 'Enter') togglePlayback(); });
+
+  function togglePlayback() {
+    if (!video.src && !state.hls) return;
+    if (video.paused) void video.play();
+    else video.pause();
+  }
 
   function status(message, error = false) {
     const el = $('.icp-status');
@@ -211,7 +235,7 @@
       $('.icp-course-title').textContent = state.course.title;
       $('.icp-teacher').textContent = state.course.teacher;
       renderList();
-      status('已找到 ' + state.course.lectures.length + ' 节课。选择课次后将依次尝试参考项目的视频地址来源。');
+      status('已找到 ' + state.course.lectures.length + ' 节课。选择课次后自动尝试直播或录播。');
     } catch (error) {
       status('无法读取课程：' + error.message + '。请检查登录状态和课程权限。', true);
     } finally {
@@ -231,7 +255,7 @@
       const name = document.createElement('strong');
       name.textContent = lecture.title;
       const meta = document.createElement('span');
-      meta.textContent = lecture.date + (lecture.available ? ' · 已标记录播' : ' · 可尝试获取视频');
+      meta.textContent = lecture.date + (lecture.live ? ' · 直播课次' : lecture.available ? ' · 已标记录播' : ' · 可尝试获取视频');
       button.append(name, meta);
       button.addEventListener('click', () => playLecture(lecture));
       list.append(button);
@@ -298,6 +322,17 @@
           { course_id: state.courseId, sub_id: lecture.id }, { allowPartial: true });
       } catch { /* Match the reference client's get-sub-detail fallback. */ }
       if (state.loadToken !== token) return;
+      const activeLive = sub?.data ? (String(sub.data.sub_type || '').includes('live') && ['1', '2'].includes(String(sub.data.sub_status))) : lecture.live;
+      if (lecture.live !== activeLive) { lecture.live = activeLive; renderList(); }
+      if (sub?.data?.can_watch === false && (activeLive || sub.data.live_url?.output)) {
+        throw new Error('平台当前未开放或未授权观看这场直播，请在官方页面检查。');
+      }
+      const liveSource = activeLive ? core.selectLive(sub || { data: {} }) : null;
+      if (liveSource) {
+        await startLive(liveSource, lecture);
+        return;
+      }
+      if (activeLive) throw new Error('直播尚未提供可播放的 HLS 地址，请稍后重试。');
       let source = core.selectVideo(sub || { data: {} });
       const infoNow = Number(sub?.data?.now || sub?.data?.content?.now) || null;
       if (!source) {
@@ -332,16 +367,21 @@
       url = new URL(raw);
       if (!['https:', 'http:'].includes(url.protocol) || !/\.m3u8$/i.test(url.pathname)) throw new Error();
     } catch { return status('请输入有效的 HTTP(S) .m3u8 直播地址。', true); }
+    await startLive(raw);
+  }
+
+  async function startLive(raw, lecture = null) {
     resetVideo();
-    state.current = null;
+    state.current = lecture;
     state.live = true;
     state.restoreAt = 0;
-    $('.icp-now-title').textContent = 'HLS 直播';
-    $('.icp-date').textContent = '';
+    $('.icp-now-title').textContent = lecture?.title || 'HLS 直播';
+    $('.icp-date').textContent = lecture?.date || '';
     $('.icp-placeholder').hidden = true;
     $('.icp-go-live').hidden = false;
     renderList();
     updateCaptionButton();
+    const url = new URL(raw);
     const source = ctx.vpn && url.hostname !== location.hostname ? core.vpnUrl(raw) : raw;
     status('正在连接直播流…');
     try {
@@ -411,25 +451,30 @@
   });
   video.addEventListener('timeupdate', () => {
     updateActiveCue();
-    if (state.current && Math.abs(video.currentTime - state.lastSaved) >= 5) {
+    if (state.current && !state.live && Math.abs(video.currentTime - state.lastSaved) >= 5) {
       state.lastSaved = video.currentTime;
       localStorage.setItem(progressKey(state.current), String(Math.floor(video.currentTime)));
     }
   });
-  video.addEventListener('ended', () => { if (state.current) localStorage.removeItem(progressKey(state.current)); });
+  video.addEventListener('ended', () => { if (state.current && !state.live) localStorage.removeItem(progressKey(state.current)); });
   video.addEventListener('error', () => { if (video.src) status('视频加载失败。请检查播放权限或重新选择课次。', true); });
   }
   bindVideoHandlers();
   document.addEventListener('keydown', (event) => {
-    if (panel.hidden || event.altKey || event.ctrlKey || event.metaKey || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+    if (panel.hidden || event.altKey || event.ctrlKey || event.metaKey || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable) return;
     const key = event.key.toLowerCase();
     if (key === 'escape' && !document.fullscreenElement) { close(); return; }
     if (!video.src && !state.hls) return;
-    if (key === ' ' || key === 'k') { event.preventDefault(); if (video.paused) void video.play(); else video.pause(); }
+    if (key === ' ' || key === 'spacebar' || key === 'k') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.repeat) return;
+      togglePlayback();
+    }
     if (key === 'arrowleft') { event.preventDefault(); seek(-10); }
     if (key === 'arrowright') { event.preventDefault(); seek(10); }
     if (key === 'f') { event.preventDefault(); void toggleFullscreen(); }
     if (key === 'p') { event.preventDefault(); void togglePip(); }
     if (key === 'c') toggleCaptions();
-  });
+  }, true);
 })();

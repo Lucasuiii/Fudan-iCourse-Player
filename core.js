@@ -60,7 +60,7 @@
             if (!item.id) continue;
             const title = String(item.sub_title || '课次 ' + item.id);
             const date = /^\d{4}-\d{2}-\d{2}/.exec(title)?.[0] || [year, month.padStart(2, '0'), day.padStart(2, '0')].join('-');
-            lectures.push({ id: String(item.id), title, date, available: String(item.playback_status) === '1' });
+            lectures.push({ id: String(item.id), title, date, available: String(item.playback_status) === '1', live: String(item.sub_type || '').includes('live') && ['1', '2'].includes(String(item.sub_status)) });
           }
         }
       }
@@ -85,6 +85,25 @@
           return { url: candidate, now: Number(info.now || info.content?.now) || null };
         }
       } catch { /* Try the next source. */ }
+    }
+    return null;
+  }
+
+  function selectLive(data) {
+    const info = data.data || {};
+    const live = info.live_url || {};
+    if (!live.output) return null;
+    const output = live.output;
+    const candidates = typeof output === 'string' ? (/\.m3u8(?:$|[?#])/i.test(output) ? [output] : []) : [output.m3u8, output.m3u8_lhd, output.m3u8_lsd];
+    for (const candidate of candidates) {
+      if (typeof candidate !== 'string') continue;
+      try {
+        const url = new URL(candidate);
+        if (['https:', 'http:'].includes(url.protocol)) {
+          url.searchParams.set('clientUUID', crypto.randomUUID());
+          return url.toString();
+        }
+      } catch { /* Try the next quality. */ }
     }
     return null;
   }
@@ -123,5 +142,5 @@
     return 'WEBVTT\n\n' + cues.map((cue) => stamp(cue.start) + ' --> ' + stamp(cue.end) + '\n' + cue.text.replace(/-->/g, '→').replace(/[<>]/g, '') + '\n').join('\n');
   }
 
-  root.ICourseCore = { context, vpnUrl, courseIdFromUrl, api, parseCourse, selectVideo, signVideo, subtitleCues, subtitleVtt };
+  root.ICourseCore = { context, vpnUrl, courseIdFromUrl, api, parseCourse, selectVideo, selectLive, signVideo, subtitleCues, subtitleVtt };
 })(globalThis);

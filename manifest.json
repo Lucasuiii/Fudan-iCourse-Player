@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "iCourse 随行播放器",
-  "version": "0.2.0",
-  "description": "在已登录的复旦 iCourse 页面中播放课程，提供官方字幕和可选的轻度降噪。",
+  "version": "0.3.0",
+  "description": "在已登录的复旦 iCourse 页面中自动查找直播与录播，提供字幕和可选降噪。",
   "content_scripts": [{
     "matches": ["https://icourse.fudan.edu.cn/*", "https://webvpn.fudan.edu.cn/https/77726476706e69737468656265737421f9f44e8935236d1e781d8dad961b2631a501f26f/*"],
     "js": ["vendor/crypto-js.js", "vendor/hls.min.js", "core.js", "content.js"],

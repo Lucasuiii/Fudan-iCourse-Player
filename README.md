@@ -1,6 +1,6 @@
 # iCourse 随行播放器
 
-在已经登录的复旦 iCourse 页面中观看课程。支持课次列表、搜索、倍速、快捷键、画中画、全屏、官方字幕、逐句字幕跳转、断点续播与可选的轻度降噪。也可以粘贴本人有权限的 HLS `.m3u8` 地址观看直播。
+在已经登录的复旦 iCourse 页面中观看课程。支持课次列表、搜索、自动发现直播源、倍速、快捷键、画中画、全屏、官方字幕、逐句字幕跳转、断点续播与可选的轻度降噪。也可以粘贴本人有权限的 HLS `.m3u8` 地址观看直播。默认画面为 16:9；非全屏时点击画面或按空格可暂停、继续。
 
 ## 安装
 
@@ -12,7 +12,7 @@
 
 ## 直播
 
-如果你已从平台获得有权限的 `.m3u8` 直播地址，可从“连接直播流”中粘贴。播放器使用 [hls.js](https://github.com/video-dev/hls.js) 播放，并提供“回到直播”按钮。参考仓库只公开了录播 MP4 的发现方式，没有直播源发现接口，因此本版本无法自动列出正在直播的课程。直播服务器若限制跨域请求，浏览器可能无法播放该地址。
+选择正在直播的课次时，扩展从平台的 `/courseapi/v3/portal-home-setting/get-sub-info` 读取 `live_url.output`，优先使用其 HLS 地址，并像平台播放器一样附加 `clientUUID`。若接口返回 `can_watch: false` 或没有直播地址，会显示原因，不会尝试绕过权限。平台状态可能与课表日期不同，以接口返回为准。也可从“连接直播流”粘贴本人有权限的 `.m3u8` 地址。播放器使用 [hls.js](https://github.com/video-dev/hls.js)，并提供“回到直播”按钮。直播服务器若限制跨域请求，浏览器可能无法播放该地址。
 
 ## 字幕与声音
 
@@ -23,6 +23,7 @@
 
 - 课程列表沿用参考项目的 `/courseapi/v3/multi-search/get-course-detail`。所有课次均可尝试播放，列表会标示平台的 `playback_status`。
 - 视频沿用参考项目的顺序：先查询 `/courseapi/v3/portal-home-setting/get-sub-info`，依次尝试 `video_list[*].preview_url`、`playurl[*]`、`content.playback.url`；仍没有地址时再查询 `/courseapi/v3/multi-search/get-sub-detail` 的 `content.playback.url`。`get-sub-info` 返回非零代码但附带数据时，仍检查该数据。取得地址后使用 `/userapi/v1/infosimple` 的账户信息生成相同的 `clientUUID`、`t` 参数。
+- 直播源发现依据 iCourse 当前网页的播放逻辑：活动课次从 `get-sub-info` 的 `live_url.output` 读取直播地址；不会遍历其他课程或保存带签名的地址。课程状态与可观看权限由平台接口决定。
 - 字幕来自 `/courseapi/v3/web-socket/search-trans-result`，在页面内生成 WebVTT，同时供逐句字幕列表使用。
 - 本地只保存课程 ID 与课次对应的播放进度。视频、字幕、账号和直播地址不会被持久保存；关闭播放器时视频暂停。
 
