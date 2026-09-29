@@ -37,25 +37,9 @@
   const input = $('.icp-course-id');
   const list = $('.icp-list');
   const filter = $('.icp-filter');
-  const stage = $('.icp-stage');
-  function fitStage() {
-    if (panel.hidden || document.fullscreenElement) return;
-    const main = $('.icp-main');
-    const style = getComputedStyle(main);
-    const availableWidth = main.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-    const controlsHeight = $('.icp-now').offsetHeight + $('.icp-tools').offsetHeight + $('.icp-hint').offsetHeight + 9;
-    const availableHeight = main.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - controlsHeight;
-    if (availableWidth > 0 && availableHeight > 0) stage.style.width = Math.floor(Math.min(availableWidth, Math.max(190, availableHeight) * 16 / 9)) + 'px';
-  }
-  const stageObserver = new ResizeObserver(fitStage);
-  for (const element of [$('.icp-main'), $('.icp-now'), $('.icp-tools')]) stageObserver.observe(element);
-  document.addEventListener('fullscreenchange', () => {
-    if (document.fullscreenElement) stage.style.width = '';
-    else fitStage();
-  });
   panel.querySelectorAll('.icp-tab').forEach((button) => button.addEventListener('click', () => showTab(button.dataset.tab)));
   input.value = core.courseIdFromUrl(location.href);
-  launcher.addEventListener('click', () => { panel.hidden = false; launcher.hidden = true; fitStage(); if (input.value && !state.course) loadCourse(); });
+  launcher.addEventListener('click', () => { panel.hidden = false; launcher.hidden = true; if (input.value && !state.course) loadCourse(); });
   $('.icp-close').addEventListener('click', close);
   panel.addEventListener('click', (event) => { if (event.target === panel) close(); });
   $('.icp-load').addEventListener('click', loadCourse);
@@ -417,12 +401,12 @@
       const blob = new Blob([core.subtitleVtt(state.cues)], { type: 'text/vtt' });
       state.subtitleUrl = URL.createObjectURL(blob);
       const track = document.createElement('track');
-      track.kind = 'subtitles'; track.label = '官方字幕'; track.srclang = 'zh'; track.src = state.subtitleUrl;
+      track.kind = 'subtitles'; track.label = '平台转写'; track.srclang = 'zh'; track.src = state.subtitleUrl;
       track.default = state.captionOn;
       video.append(track);
       if (video.textTracks[0]) video.textTracks[0].mode = state.captionOn ? 'showing' : 'disabled';
       track.addEventListener('load', () => { if (video.textTracks[0]) video.textTracks[0].mode = state.captionOn ? 'showing' : 'disabled'; });
-      status('正在播放 · 已加载 ' + state.cues.length + ' 条官方字幕。');
+      status('正在播放 · 已加载 ' + state.cues.length + ' 条平台转写字幕。');
     } catch { if (state.loadToken === token) status('正在播放 · 暂时无法读取官方字幕。'); }
   }
 

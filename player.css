@@ -8,7 +8,7 @@
 #icp-panel button,#icp-panel input,#icp-panel select{font:inherit}
 #icp-panel button{cursor:pointer}
 #icp-panel button:focus-visible,#icp-panel input:focus-visible,#icp-panel select:focus-visible,#icp-panel summary:focus-visible{outline:3px solid #7cb4a2;outline-offset:2px}
-#icp-panel .icp-shell{display:flex;flex-direction:column;width:min(1320px,100%);height:min(860px,100%);min-height:470px;overflow:hidden;border:1px solid #dae5dd;border-radius:22px;background:#f4f7f3;box-shadow:0 30px 90px #07191378}
+#icp-panel .icp-shell{display:flex;flex-direction:column;width:min(1520px,100%);height:min(940px,100%);min-height:470px;overflow:hidden;border:1px solid #dae5dd;border-radius:22px;background:#f4f7f3;box-shadow:0 30px 90px #07191378}
 #icp-panel .icp-header{display:flex;justify-content:space-between;align-items:center;gap:18px;min-height:77px;padding:15px 24px;border-bottom:1px solid #e3ebe5;background:#fff}
 #icp-panel .icp-brand{display:flex;align-items:center;gap:13px}
 #icp-panel .icp-mark{display:grid;place-items:center;width:42px;height:42px;padding-left:3px;border-radius:13px;background:#236552;color:#fff;font-size:16px;box-shadow:0 5px 13px #23655237}
@@ -34,7 +34,7 @@
 #icp-panel .icp-live-open{height:38px;padding:0 13px;border:1px solid #b8d6c6;border-radius:9px;background:#e8f5ec;color:#235746;font-size:12px;font-weight:750;white-space:nowrap}
 #icp-panel .icp-status{min-height:32px;margin:0;padding:4px 24px 8px;border-bottom:1px solid #e3ebe5;background:#fff;color:#557569;font-size:11px}
 #icp-panel .icp-status.icp-error{color:#ad4650}
-#icp-panel .icp-layout{display:grid;grid-template-columns:302px minmax(0,1fr);flex:1;min-height:0}
+#icp-panel .icp-layout{display:grid;grid-template-columns:280px minmax(0,1fr);flex:1;min-height:0}
 #icp-panel .icp-sidebar{display:flex;flex-direction:column;min-height:0;border-right:1px solid #e0e9e1;background:#fdfefd}
 #icp-panel .icp-course{display:grid;gap:4px;padding:19px 19px 15px}
 #icp-panel .icp-course small{color:#7d998a;font-size:10px;font-weight:800;letter-spacing:1px}
