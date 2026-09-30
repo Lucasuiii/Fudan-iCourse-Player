@@ -40,14 +40,31 @@
   async function api(ctx, path, params = {}, options = {}) {
     const url = new URL(ctx.apiBase + path);
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, String(value)));
-    const response = await fetch(url, { credentials: 'include', redirect: 'follow' });
-    if (!response.ok) throw new Error('请求失败（HTTP ' + response.status + '）');
-    const data = await response.json().catch(() => { throw new Error('登录已失效或接口没有返回课程数据'); });
-    if (Number(data.code) !== 0 && Number(data.code) !== 200) {
-      const partial = data.data && typeof data.data === 'object' && Object.keys(data.data).length > 0;
-      if (!(options.allowPartial && partial)) throw new Error(data.msg || '平台接口未返回可用数据');
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    if (options.signal?.aborted) cancel();
+    else options.signal?.addEventListener('abort', cancel, { once: true });
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; cancel(); }, options.timeoutMs ?? 20000);
+    try {
+      const response = await fetch(url, { credentials: 'include', redirect: 'follow', signal: controller.signal });
+      if (!response.ok) throw new Error('请求失败（HTTP ' + response.status + '）');
+      const data = await response.json().catch((error) => {
+        if (controller.signal.aborted) throw error;
+        throw new Error('登录已失效或接口没有返回课程数据');
+      });
+      if (Number(data.code) !== 0 && Number(data.code) !== 200) {
+        const partial = data.data && typeof data.data === 'object' && Object.keys(data.data).length > 0;
+        if (!(options.allowPartial && partial)) throw new Error(data.msg || '平台接口未返回可用数据');
+      }
+      return data;
+    } catch (error) {
+      if (timedOut) throw new Error('请求超时，请检查网络后重试');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      options.signal?.removeEventListener('abort', cancel);
     }
-    return data;
   }
 
   function parseCourse(data) {
@@ -67,6 +84,19 @@
     }
     lectures.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
     return { title: String(course.title || '未命名课程'), teacher: String(course.realname || ''), lectures };
+  }
+
+  function hasLectureStarted(lecture, now = new Date()) {
+    // Campus dates are evaluated in China time, independent of browser timezone.
+    const parts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+    const value = (type) => parts.find((part) => part.type === type).value;
+    const today = value('year') + '-' + value('month') + '-' + value('day');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(lecture.date || '')) return true;
+    if (lecture.date !== today) return lecture.date < today;
+    // Honor an explicit clock time in the title; do not guess class-period times.
+    const time = /^\d{4}-\d{2}-\d{2}[ T]+(\d{1,2}):(\d{2})/.exec(lecture.title || '');
+    if (!time || Number(time[1]) > 23 || Number(time[2]) > 59) return true;
+    return new Date(lecture.date + 'T' + time[1].padStart(2, '0') + ':' + time[2] + ':00+08:00').getTime() <= now.getTime();
   }
 
   function selectVideo(data, options = {}) {
@@ -108,6 +138,34 @@
     return null;
   }
 
+  // Inspect platform metadata only; never fetch media or persist signed URLs.
+  async function probeLecture(ctx, courseId, lecture, options = {}) {
+    const params = { course_id: courseId, sub_id: lecture.id };
+    let sub = null;
+    let infoFailed = false;
+    try {
+      sub = await api(ctx, '/courseapi/v3/portal-home-setting/get-sub-info', params, { ...options, allowPartial: true });
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      infoFailed = true;
+    }
+    const activeLive = sub?.data ? String(sub.data.sub_type || '').includes('live') && ['1', '2'].includes(String(sub.data.sub_status)) : lecture.live;
+    if (!sub && activeLive) return 'unknown';
+    if (sub?.data?.can_watch === false && (activeLive || sub.data.live_url?.output)) return 'missing';
+    if (sub && activeLive) {
+      return selectLive(sub) ? 'live' : 'missing';
+    }
+    if (selectVideo(sub || { data: {} })) return 'video';
+    try {
+      const detail = await api(ctx, '/courseapi/v3/multi-search/get-sub-detail', params, options);
+      if (selectVideo(detail, { allowAnyNested: true })) return 'video';
+      return infoFailed ? 'unknown' : 'missing';
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      return 'unknown';
+    }
+  }
+
   function signVideo(rawUrl, user, now = Math.floor(Date.now() / 1000)) {
     const url = new URL(rawUrl);
     const userId = String(user.id || '');
@@ -142,5 +200,5 @@
     return 'WEBVTT\n\n' + cues.map((cue) => stamp(cue.start) + ' --> ' + stamp(cue.end) + '\n' + cue.text.replace(/-->/g, '→').replace(/[<>]/g, '') + '\n').join('\n');
   }
 
-  root.ICourseCore = { context, vpnUrl, courseIdFromUrl, api, parseCourse, selectVideo, selectLive, signVideo, subtitleCues, subtitleVtt };
+  root.ICourseCore = { context, vpnUrl, courseIdFromUrl, api, parseCourse, hasLectureStarted, selectVideo, selectLive, probeLecture, signVideo, subtitleCues, subtitleVtt };
 })(globalThis);

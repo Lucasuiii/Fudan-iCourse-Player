@@ -1,0 +1,111 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const { webcrypto } = require('node:crypto');
+const source = fs.readFileSync(path.join(__dirname, '../core.js'), 'utf8');
+function core(fetch) {
+  const sandbox = { URL, AbortController, setTimeout, clearTimeout, crypto: webcrypto, fetch, CryptoJS: require('../vendor/crypto-js.js') };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.ICourseCore;
+}
+const ctx = { apiBase: 'https://icourse.fudan.edu.cn', vpn: false };
+function stalledFetch(_url, options) {
+  return new Promise((_resolve, reject) => {
+    const cancel = () => reject(new DOMException('Aborted', 'AbortError'));
+    if (options.signal.aborted) cancel();
+    else options.signal.addEventListener('abort', cancel, { once: true });
+  });
+}
+test('a stalled request times out with an actionable message', async () => {
+  await assert.rejects(core(stalledFetch).api(ctx, '/test', {}, { timeoutMs: 10 }), /请求超时/);
+});
+test('caller cancellation is preserved, including cancellation before fetch', async () => {
+  for (const before of [false, true]) {
+    const controller = new AbortController();
+    if (before) controller.abort();
+    const request = core(stalledFetch).api(ctx, '/test', {}, { signal: controller.signal });
+    if (!before) controller.abort();
+    await assert.rejects(request, { name: 'AbortError' });
+  }
+});
+test('timeout also covers a stalled response body', async () => {
+  const fetch = async (_url, options) => ({ ok: true, json: () => stalledFetch(_url, options) });
+  await assert.rejects(core(fetch).api(ctx, '/test', {}, { timeoutMs: 10 }), /请求超时/);
+});
+test('partial get-sub-info remains usable; other API errors remain errors', async () => {
+  const result = { code: 7001, data: { content: { playback: { url: 'https://example.test/a.mp4' } } } };
+  const c = core(async () => ({ ok: true, json: async () => result }));
+  assert.equal(await c.api(ctx, '/test', {}, { allowPartial: true }), result);
+  await assert.rejects(c.api(ctx, '/test'), /平台接口/);
+});
+test('source selection preserves reference ordering and get-sub-detail fallback', () => {
+  const c = core();
+  const data = { data: { video_list: { a: { preview_url: 'https://example.test/first.mp4' } }, playurl: { now: 100, a: 'https://example.test/second.mp4' }, content: { playback: { url: 'https://example.test/nested.mp4' } } } };
+  assert.match(c.selectVideo(data).url, /first\.mp4/);
+  data.data.video_list = {};
+  assert.match(c.selectVideo(data).url, /second\.mp4/);
+  data.data.playurl = {};
+  assert.match(c.selectVideo(data).url, /nested\.mp4/);
+  data.data.content.playback.url = 'https://example.test/stream.m3u8';
+  assert.equal(c.selectVideo(data), null);
+  assert.match(c.selectVideo(data, { allowAnyNested: true }).url, /stream\.m3u8/);
+});
+test('direct intranet and WebVPN context remain separate and signing preserves URL parameters', () => {
+  const c = core();
+  const direct = c.context(new URL('https://icourse.fudan.edu.cn/course/123'));
+  assert.equal(direct.vpn, false);
+  const vpn = c.context(new URL(c.vpnUrl('https://icourse.fudan.edu.cn/course/123')));
+  assert.equal(vpn.vpn, true);
+  assert.equal(c.context(new URL('https://example.test/')), null);
+  const signed = new URL(c.signVideo('https://example.test/a.mp4?existing=1', { id: '1', tenant_id: '2', phone: '123' }, 100));
+  assert.equal(signed.searchParams.get('existing'), '1');
+  assert.match(signed.searchParams.get('t'), /^1-100-[a-f0-9]{32}$/);
+});
+test('resource probe keeps partial responses and detail fallback without trusting playback_status', async () => {
+  let calls = [];
+  const c = core(async (url) => {
+    calls.push(url.pathname);
+    return { ok: true, json: async () => url.pathname.endsWith('get-sub-info')
+      ? { code: 7001, data: { content: { playback: { url: 'https://example.test/a.mp4' } } } }
+      : { code: 0, data: {} } };
+  });
+  assert.equal(await c.probeLecture(ctx, '11', { id: '101', available: false }), 'video');
+  assert.equal(calls.length, 1);
+  const fallback = core(async (url) => ({ ok: true, json: async () => ({ code: 0, data: url.pathname.endsWith('get-sub-detail') ? { content: { playback: { url: 'https://example.test/a.m3u8' } } } : {} }) }));
+  assert.equal(await fallback.probeLecture(ctx, '11', { id: '101' }), 'video');
+});
+test('resource probe distinguishes absent resources from failed requests', async () => {
+  const empty = core(async () => ({ ok: true, json: async () => ({ code: 0, data: {} }) }));
+  assert.equal(await empty.probeLecture(ctx, '11', { id: '101' }), 'missing');
+  const failed = core(async () => { throw new Error('offline'); });
+  assert.equal(await failed.probeLecture(ctx, '11', { id: '101' }), 'unknown');
+  const partlyFailed = core(async (url) => {
+    if (url.pathname.endsWith('get-sub-info')) throw new Error('offline');
+    return { ok: true, json: async () => ({ code: 0, data: {} }) };
+  });
+  assert.equal(await partlyFailed.probeLecture(ctx, '11', { id: '101' }), 'unknown');
+});
+test('resource probe checks active live sources and platform permission', async () => {
+  for (const [canWatch, expected] of [[true, 'live'], [false, 'missing']]) {
+    const c = core(async () => ({ ok: true, json: async () => ({ code: 0, data: { sub_type: 'live', sub_status: 1, can_watch: canWatch, live_url: { output: { m3u8: 'https://example.test/live.m3u8' } } } }) }));
+    assert.equal(await c.probeLecture(ctx, '11', { id: '101' }), expected);
+  }
+});
+test('resource probe propagates cancellation instead of marking a lecture missing', async () => {
+  const controller = new AbortController();
+  const request = core(stalledFetch).probeLecture(ctx, '11', { id: '101' }, { signal: controller.signal });
+  controller.abort();
+  await assert.rejects(request, { name: 'AbortError' });
+});
+test('future lectures are hidden using campus timezone and explicit start times', () => {
+  const c = core();
+  const now = new Date('2026-09-30T00:00:00Z'); // 08:00 in China.
+  assert.equal(c.hasLectureStarted({ date: '2026-10-02', title: '2026-10-02第6-8节' }, now), false);
+  assert.equal(c.hasLectureStarted({ date: '2026-09-29' }, now), true);
+  assert.equal(c.hasLectureStarted({ date: '2026-09-30', title: '2026-09-30 09:00' }, now), false);
+  assert.equal(c.hasLectureStarted({ date: '2026-09-30', title: '2026-09-30 08:00' }, now), true);
+  assert.equal(c.hasLectureStarted({ date: '2026-09-30', title: '2026-09-30第6-8节' }, now), true);
+  assert.equal(c.hasLectureStarted({ date: '2026-10-01' }, new Date('2026-09-30T16:00:00Z')), true);
+});
