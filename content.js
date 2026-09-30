@@ -238,6 +238,11 @@
   }
 
   function isStreaming() { return ['local', 'whisper-live'].includes(state.captionSource); }
+  function streamingRateStatus() {
+    const rate = video.playbackRate;
+    if (state.captionSource === 'whisper-live') return rate >= 0.75 && rate <= 2 ? 'Whisper 流式已就绪 · ' + rate + '×' : 'Whisper 流式仅支持 0.75×–2×，请调整播放速度';
+    return rate === 1 ? '本地识别已就绪' : '本地识别仅支持 1×，请切回原速';
+  }
   function mediaClock() {
     return { epoch: state.asrEpoch, time: video.currentTime, paused: video.paused || video.seeking || panel.hidden, rate: video.playbackRate };
   }
@@ -245,7 +250,9 @@
     if (!isStreaming()) return;
     if (reset) { state.asrEpoch++; $('.icp-local-caption').textContent = ''; $('.icp-local-caption').hidden = true; }
     void voiceRequest('clock', { clock: mediaClock() }).catch(() => {});
-    if (video.playbackRate !== 1) $('.icp-subtitle-status').textContent = '本地识别仅支持 1×，请切回原速';
+    const label = $('.icp-subtitle-status');
+    const supported = state.captionSource === 'whisper-live' ? video.playbackRate >= 0.75 && video.playbackRate <= 2 : video.playbackRate === 1;
+    if (!supported || label.textContent.includes('仅支持')) label.textContent = streamingRateStatus();
   }
   async function changeCaptionSource() {
     const wasWaiting = whisperResume;
@@ -353,7 +360,7 @@
     const label = $('.icp-subtitle-status');
     if (event.type === 'error') { $('.icp-local-caption').hidden = true; label.textContent = '本地识别停止：' + event.error; return; }
     if (event.type === 'loading') { label.textContent = state.captionSource === 'whisper-live' ? '正在连接 Whisper 流式模型…' : '正在加载本地中文模型…'; return; }
-    if (event.type === 'ready') { label.textContent = video.playbackRate === 1 ? '本地识别已就绪' : '本地识别仅支持 1×，请切回原速'; return; }
+    if (event.type === 'ready') { label.textContent = streamingRateStatus(); return; }
     if (event.type !== 'text' || event.epoch !== state.asrEpoch) return;
     const overlay = $('.icp-local-caption');
     const chars = Array.from(event.text);
