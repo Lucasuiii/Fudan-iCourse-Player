@@ -8,3 +8,11 @@ vendor/sherpa/*.wasm
 vendor/sherpa/*.data
 __pycache__/
 *.pyc
+
+# Local speech models, authorized classroom media, and connection state
+*.bin
+*.mp4
+*.wav
+connection-key.txt
+recordings.json
+local-whisper/state/

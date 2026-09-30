@@ -80,3 +80,28 @@ chrome.tabs.onRemoved.addListener((tabId) => { void serialized(() => stopTab(tab
 chrome.tabs.onUpdated.addListener((tabId, change) => {
   if (change.status === 'loading') void serialized(() => stopTab(tabId)).catch(() => {});
 });
+
+// Separate queue: model inference must never block voice cleanup or tab capture.
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message?.target !== 'whisper-background' || sender.id !== chrome.runtime.id) return;
+  const options = sender.url === chrome.runtime.getURL('options.html') && !sender.tab;
+  if (!sender.tab && !options) return;
+  if (!['chunk', 'health', 'settings'].includes(message.type) || (options && message.type === 'chunk')) return;
+  const job = (async () => {
+    if (message.type === 'settings') { if (/^\d{1,10}$/.test(message.courseId || '')) await chrome.storage.local.set({ whisperCourseId: message.courseId }); await chrome.runtime.openOptionsPage(); return {}; }
+    const { whisperKey, whisperPrompts } = await chrome.storage.local.get(['whisperKey', 'whisperPrompts']);
+    const whisperPrompt = /^\d{1,10}$/.test(message.courseId || '') ? whisperPrompts?.[message.courseId] : '';
+    if (!whisperKey) throw Error('请先点“Whisper 设置”，填写本地服务连接密钥');
+    const response = await fetch('http://127.0.0.1:8766/' + (message.type === 'chunk' ? 'chunk' : 'health'), {
+      method: message.type === 'chunk' ? 'POST' : 'GET',
+      headers: { Authorization: 'Bearer ' + whisperKey, 'Content-Type': 'application/json' },
+      ...(message.type === 'chunk' ? { body: JSON.stringify({ source: message.chunk?.source, start: message.chunk?.start, duration: message.chunk?.duration, ...(whisperPrompt ? { prompt: whisperPrompt } : {}) }) } : {}),
+      signal: AbortSignal.timeout(180000)
+    }).catch(() => { throw Error('无法连接本地 Whisper 服务，请确认服务正在运行'); });
+    const result = await response.json();
+    if (!response.ok) throw Error(result.error || '本地识别失败');
+    return result;
+  })();
+  job.then(result => respond({ ok: true, result }), error => respond({ ok: false, error: error.message }));
+  return true;
+});
