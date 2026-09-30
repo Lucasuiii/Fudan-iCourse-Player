@@ -31,3 +31,11 @@ test('PCM inference accepts only the extension offscreen owner with active captu
  a.chrome.runtime.sendMessage=async()=>({ok:true,state:{tabId:null}});
  assert.match((await a.send({type:'stream',samples:[0]},{id:'own',url:'chrome-extension://own/offscreen.html'})).error,/停止/);
 });
+test('saved terms notify matching-course players without exposing key or prompt',async()=>{
+ let changed;const notices=[];const event={addListener(){}};
+ const chrome={runtime:{id:'own',getURL:p=>'chrome-extension://own/'+p,onMessage:event},tabs:{onRemoved:event,onUpdated:event,query:async()=>[{id:1}],sendMessage:async(id,m)=>notices.push(m)},action:{onClicked:event},storage:{onChanged:{addListener:f=>changed=f}}};
+ vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../background.js'),'utf8'),{chrome});
+ changed({whisperPrompts:{oldValue:{'11':'old','22':'unchanged'},newValue:{'11':'QR 分解','22':'unchanged'}}},'local');
+ await new Promise(r=>setImmediate(r));assert.deepEqual(Array.from(notices[0].courseIds),['11']);assert.equal(JSON.stringify(notices).includes('QR'),false);
+ changed({whisperKey:{oldValue:'secret',newValue:'newsecret'}},'local');await new Promise(r=>setImmediate(r));assert.equal(notices[1].all,true);assert.equal(JSON.stringify(notices).includes('secret'),false);
+});

@@ -1,4 +1,4 @@
-/* global ICourseVoice, ICourseASR */
+/* global ICourseVoice, ICourseWhisperStream */
 'use strict';
 let session = null;
 let queue = Promise.resolve();
@@ -18,13 +18,14 @@ async function configureASR(enabled, clock, engine, courseId) {
   session.asr?.close(); session.asr = null;
   if (!enabled) return;
   const owner = session;
-  const asr = new (engine === 'whisper' ? ICourseWhisperStream.WhisperStream : ICourseASR.ASRSession)(owner.context, owner.source, (event) => {
-    if (session !== owner) return;
+  const asr = new ICourseWhisperStream.WhisperStream(owner.context, owner.source, (event) => {
+    if (session !== owner || owner.asr !== asr) return;
     void chrome.runtime.sendMessage({ target: 'voice-background', type: 'asr-event', tabId: owner.tabId, event }).catch(() => {});
   }, courseId);
   owner.asr = asr;
-  try { await asr.start(); if (clock) asr.setClock(clock); }
-  catch (error) { asr.fail(error.message); }
+  owner.clock = clock || owner.clock;
+  if (owner.clock) asr.setClock(owner.clock);
+  void asr.start().then(() => { if (session === owner && owner.asr === asr && owner.clock) asr.setClock(owner.clock); }).catch(error => { if (session === owner && owner.asr === asr) asr.fail(error.message); });
 }
 async function handle(message) {
   if (message.type === 'clock') { if (session?.tabId === message.tabId) { session.clock = message.clock; session.asr?.setClock(message.clock); } return snapshot(); }

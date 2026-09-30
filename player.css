@@ -186,3 +186,27 @@
 @media(min-width:821px){
   #icp-panel .icp-tools{position:sticky;bottom:0;z-index:6;padding:10px;border:1px solid var(--icp-line);border-radius:16px;background:var(--icp-surface-strong);box-shadow:0 4px 20px #0000000c}
 }
+
+/* A quiet viewing canvas with controls in their own row, never over the seek bar. */
+#icp-panel .icp-header{min-height:58px;padding:12px 20px}
+#icp-panel .icp-header h2{font-size:20px}
+#icp-panel .icp-brand small{font-size:9px;letter-spacing:2px}
+#icp-panel .icp-mark{width:36px;height:36px;border-radius:12px}
+#icp-panel .icp-topbar{padding:10px 20px 6px;gap:10px}
+#icp-panel .icp-course-id{width:160px}
+#icp-panel .icp-statusbar{padding:6px 20px 10px;min-height:26px}
+#icp-panel .icp-main{padding:12px;gap:0}
+#icp-panel .icp-tools{order:-2;position:sticky;top:0;bottom:auto;margin:0 0 12px;padding:8px 10px;border:1px solid var(--icp-line);border-radius:14px;background:var(--icp-surface-strong);box-shadow:none;z-index:6;gap:8px}
+#icp-panel .icp-toolgroup button,#icp-panel .icp-toolgroup label{border-radius:10px;min-height:34px;padding:0 10px;box-shadow:none}
+#icp-panel .icp-more-toggle[aria-expanded="true"]{color:var(--icp-accent);background:var(--icp-accent-soft)}
+#icp-panel .icp-more{order:-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin:0 0 12px;padding:16px;border:1px solid var(--icp-line);border-radius:14px;background:var(--icp-control)}
+#icp-panel .icp-more[hidden]{display:none}
+#icp-panel .icp-more .icp-toolgroup{align-content:start;gap:8px}
+#icp-panel .icp-more .icp-caption-options{margin:0;align-content:start;gap:10px}
+#icp-panel .icp-more select{background:var(--icp-surface-strong);padding:6px 8px}
+#icp-panel .icp-now{padding:12px 4px}
+#icp-panel .icp-stage{border-radius:14px;box-shadow:none}
+#icp-panel .icp-sidebar{background:var(--icp-control)}
+#icp-panel .icp-hint{opacity:.65;padding:4px}
+@media(max-width:820px){#icp-panel .icp-tools{position:static}#icp-panel .icp-more{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:540px){#icp-panel .icp-course-id{width:110px}#icp-panel .icp-topbar,#icp-panel .icp-statusbar{padding-left:12px;padding-right:12px}#icp-panel .icp-main{padding:8px}#icp-panel .icp-tools{gap:8px}#icp-panel .icp-toolgroup button,#icp-panel .icp-toolgroup label{min-height:38px}}
