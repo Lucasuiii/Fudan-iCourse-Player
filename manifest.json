@@ -1,13 +1,42 @@
 {
   "manifest_version": 3,
   "name": "iCourse 随行播放器",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "在已登录的复旦 iCourse 页面中自动查找直播与录播，提供字幕和可选降噪。",
-  "content_scripts": [{
-    "matches": ["https://icourse.fudan.edu.cn/*", "https://webvpn.fudan.edu.cn/https/77726476706e69737468656265737421f9f44e8935236d1e781d8dad961b2631a501f26f/*"],
-    "js": ["vendor/crypto-js.js", "vendor/hls.min.js", "core.js", "content.js"],
-    "css": ["player.css"],
-    "run_at": "document_idle"
-  }],
-  "icons": {"128": "icon.png"}
+  "content_scripts": [
+    {
+      "matches": [
+        "https://icourse.fudan.edu.cn/*",
+        "https://webvpn.fudan.edu.cn/https/77726476706e69737468656265737421f9f44e8935236d1e781d8dad961b2631a501f26f/*"
+      ],
+      "js": [
+        "vendor/crypto-js.js",
+        "vendor/hls.min.js",
+        "core.js",
+        "content.js"
+      ],
+      "css": [
+        "player.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "128": "icon.png"
+  },
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "tabCapture",
+    "offscreen",
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "启用／停止当前课程的人声增强",
+    "default_icon": {
+      "128": "icon.png"
+    }
+  }
 }

@@ -1,6 +1,6 @@
 # 本地流式字幕与人声增强可行性评估
 
-评估日期：2026-09-30。当前实现版本：0.4.2。本文件是方案评估，不代表识别引擎或神经网络降噪已经实现或测试通过。
+评估日期：2026-09-30。当前实现版本：0.5.0。本文件保留路线评估并记录第一阶段实现；识别引擎和神经网络降噪尚未实现。
 
 ## 结论与优先顺序
 
@@ -11,7 +11,7 @@
 3. 中文流式 ASR 原型：优先试 sherpa-onnx 的中文流式模型，提供本地识别与平台字幕两种来源。
 4. 对比 RNNoise 和 DeepFilterNet，再决定是否增加更强降噪。
 
-当前只有普通内容脚本，没有后台 service worker、offscreen document、tabCapture 权限或本地推理引擎。现有降噪是 90 Hz 高通和 8 kHz 低通；字幕来自平台转写接口。
+0.5.0 已加入后台 service worker、offscreen document 和工具栏启动的 tabCapture。基础增强为 85 Hz 高通、2.2 kHz +2.5 dB 均衡、12 kHz 低通、2:1 动态压缩及固定输出补偿。原声与增强平滑切换；未实现自适应响度匹配。本地推理引擎、PCM 重采样队列及字幕识别尚未加入；字幕仍来自平台转写接口。
 
 ## 音频通道
 
@@ -60,3 +60,10 @@
 - [whisper.cpp stream 示例](https://github.com/ggml-org/whisper.cpp/blob/master/examples/stream/README.md)
 - [RNNoise](https://github.com/xiph/rnnoise)
 - [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet)
+
+## 第一阶段验证边界
+
+- Node 音频测试使用模拟 Chrome API，验证拥有者隔离、失败清理、切课竞态、标签页关闭／导航及旁路切换。
+- 浏览器真实 OfflineAudioContext：30 Hz 测试音增强后的 RMS 相对原声约 -18.2 dB；2.2 kHz 测试音没有削波，原声通路 RMS 保持。合成信号结果不能证明课堂人声更清楚。
+- 页面消息回归覆盖首次授权提示、状态同步、增强／原声、切课和关闭；没有通过模拟接口宣称实际 tabCapture 链路已测通。
+- 下一阶段先实测 Chrome 工具栏捕获与课程音频回放、暂停／倍速／拖动的同步和课堂听感，再增加 PCM 队列与流式模型；当前没有模型下载或音频上传。
