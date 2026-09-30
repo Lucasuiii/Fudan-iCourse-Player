@@ -287,6 +287,7 @@
     if (!isStreaming() || panel.hidden) return;
     const label = $('.icp-subtitle-status');
     if (event.type === 'error') { $('.icp-local-caption').hidden = true; label.textContent = '本地识别停止：' + event.error; return; }
+    if (event.type === 'backlog') { $('.icp-local-caption').hidden = true; label.textContent = 'Whisper 推理较慢 · 已跳过积压，继续识别'; return; }
     if (event.type === 'loading') { label.textContent = state.captionSource === 'whisper-live' ? '正在连接 Whisper 流式模型…' : '正在加载本地中文模型…'; return; }
     if (event.type === 'ready') { label.textContent = streamingRateStatus(); return; }
     if (event.type !== 'text' || event.epoch !== state.asrEpoch) return;
