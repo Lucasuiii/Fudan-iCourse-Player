@@ -17,5 +17,9 @@ jobs:
       - run: node --check background.js
       - run: node --check offscreen.js
       - run: node --check voice.js
+      - run: node --check asr-session.js
+      - run: node --check asr-worker.js
+      - run: node --check pcm-worklet.js
+      - run: python3 -m py_compile scripts/install-asr.py
       - run: node --test tests/*.test.cjs
       - run: git diff --check
