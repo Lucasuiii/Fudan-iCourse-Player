@@ -46,3 +46,7 @@
 - 提交前运行 `node --test tests/core.test.cjs`、`node --check core.js`、`node --check content.js` 和 `git diff --check`。播放器交互、声音或字幕改动还需要相应浏览器验证，并区分模拟结果与真实课程结果。
 - 验证通过后明确暂存相关文件并提交。版本变更同步更新 `manifest.json` 与 README，重新生成并核对 ZIP。
 - 配置远程仓库后再进行远程同步；同步前检查远程差异，保留本地改动。
+
+## 后续音频功能
+
+本地流式识别与人声增强仍处于方案评估阶段，尚未加入当前扩展。实现路线、音频捕获限制与验证要求见 [音频功能评估](docs/audio-roadmap.md)。

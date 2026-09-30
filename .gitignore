@@ -1,0 +1,6 @@
+.DS_Store
+work/
+outputs/
+.playwright-cli/
+node_modules/
+*.zip
