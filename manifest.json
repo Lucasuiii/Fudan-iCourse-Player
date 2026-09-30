@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "iCourse 随行播放器",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "在已登录的复旦 iCourse 页面中自动查找直播与录播，提供字幕和可选降噪。",
   "content_scripts": [
     {
@@ -13,6 +13,7 @@
         "vendor/crypto-js.js",
         "vendor/hls.min.js",
         "core.js",
+        "whisper-prefetch.js",
         "content.js"
       ],
       "css": [
@@ -28,7 +29,8 @@
   "permissions": [
     "tabCapture",
     "offscreen",
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
   "background": {
     "service_worker": "background.js"
@@ -41,5 +43,12 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "host_permissions": [
+    "http://127.0.0.1:8766/*"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   }
 }

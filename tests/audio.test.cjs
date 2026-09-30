@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function event() { return { addListener(fn) { this.fn = fn; } }; }
+function event() { const listeners = []; return { addListener(fn) { listeners.push(fn); }, fn(...args) { let pending = false; for (const fn of listeners) pending = fn(...args) === true || pending; return pending; } }; }
 function background() {
   let open = false, current = { tabId: null, enabled: false };
   const notices = [], calls = [];
