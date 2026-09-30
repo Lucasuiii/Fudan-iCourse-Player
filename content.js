@@ -5,7 +5,7 @@
   const ctx = core.context(location);
   if (!ctx || document.getElementById('icp-launcher')) return;
 
-  const state = { courseId: '', course: null, current: null, subtitleUrl: null, cues: [], captionOn: true, activeCue: -1, restoreAt: 0, lastSaved: 0, hls: null, live: false, audio: null, loadToken: 0, courseToken: 0, currentCourseId: '', playController: null, courseController: null, previousFocus: null, bodyOverflow: '', captionsLoading: false, courseLoading: false, backgroundNodes: [], probeController: null, probeToken: 0, probing: false };
+  const state = { courseId: '', course: null, current: null, subtitleUrl: null, cues: [], captionOn: true, activeCue: -1, restoreAt: 0, lastSaved: 0, hls: null, live: false, audio: null, audioBusy: false, loadToken: 0, courseToken: 0, currentCourseId: '', playController: null, courseController: null, previousFocus: null, bodyOverflow: '', captionsLoading: false, courseLoading: false, backgroundNodes: [], probeController: null, probeToken: 0, probing: false };
   const launcher = document.createElement('button');
   launcher.id = 'icp-launcher';
   launcher.type = 'button';
@@ -25,8 +25,8 @@
         <aside class="icp-sidebar"><div class="icp-course"><small>当前课程</small><strong class="icp-course-title">尚未选择课程</strong><span class="icp-teacher"></span><span class="icp-resource-status" role="status"></span><button class="icp-probe-retry" type="button" hidden>重新检查资源</button></div><div class="icp-tabs" role="tablist" aria-label="侧栏"><button class="icp-tab icp-tab-active" type="button" id="icp-tab-lectures" data-tab="lectures" role="tab" aria-controls="icp-pane-lectures" aria-selected="true">课次</button><button class="icp-tab" type="button" id="icp-tab-transcript" data-tab="transcript" role="tab" aria-controls="icp-pane-transcript" tabindex="-1" aria-selected="false">逐句字幕</button></div><div class="icp-lectures-pane" id="icp-pane-lectures" role="tabpanel" aria-labelledby="icp-tab-lectures"><input class="icp-filter" type="search" placeholder="搜索课次" aria-label="搜索课次"><div class="icp-list" aria-label="课次列表"></div></div><div class="icp-transcript-pane" id="icp-pane-transcript" role="tabpanel" aria-labelledby="icp-tab-transcript" hidden><div class="icp-transcript-controls"><input class="icp-transcript-filter" type="search" placeholder="搜索字幕关键词" aria-label="搜索字幕"><label class="icp-follow-label"><input class="icp-follow" type="checkbox" checked> 跟随播放</label></div><p class="icp-transcript-empty">选择课次后读取官方字幕</p><div class="icp-transcript-list"></div></div></aside>
         <main class="icp-main"><div class="icp-stage"><video class="icp-video" controls playsinline preload="metadata"></video><div class="icp-placeholder"><span>▶</span><strong>选择一节课次，开始观看</strong><small>你的课程 · 更舒服的播放体验</small></div><div class="icp-tap-target" role="button" tabindex="0" aria-label="点击暂停或继续播放"></div></div>
           <div class="icp-now"><div><small>当前课次</small><strong class="icp-now-title">等待选择课次</strong></div><span class="icp-date"></span></div>
-          <div class="icp-tools"><div class="icp-toolgroup"><button class="icp-back" type="button" title="后退 10 秒">↶ <span>10 秒</span></button><button class="icp-forward" type="button" title="前进 10 秒"><span>10 秒</span> ↷</button><button class="icp-go-live" type="button" hidden>● 回到直播</button></div><div class="icp-toolgroup"><label>速度 <select class="icp-speed"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option><option value="2.5">2.5×</option><option value="3">3×</option></select></label><button class="icp-captions" type="button" aria-pressed="false" disabled>字幕：暂无</button><button class="icp-denoise" type="button" aria-pressed="false">轻度降噪：关</button><button class="icp-pip" type="button">画中画</button><button class="icp-full" type="button">全屏</button></div></div>
-          <div class="icp-hint">空格播放/暂停 · ←/→ 快退/快进 · F 全屏 · P 画中画 · C 字幕 · 降噪默认关闭</div>
+          <div class="icp-tools"><div class="icp-toolgroup"><button class="icp-back" type="button" title="后退 10 秒">↶ <span>10 秒</span></button><button class="icp-forward" type="button" title="前进 10 秒"><span>10 秒</span> ↷</button><button class="icp-go-live" type="button" hidden>● 回到直播</button></div><div class="icp-toolgroup"><label>速度 <select class="icp-speed"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option><option value="2.5">2.5×</option><option value="3">3×</option></select></label><button class="icp-captions" type="button" aria-pressed="false" disabled>字幕：暂无</button><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button><button class="icp-pip" type="button">画中画</button><button class="icp-full" type="button">全屏</button></div></div>
+          <div class="icp-hint">空格播放/暂停 · ←/→ 快退/快进 · F 全屏 · P 画中画 · C 字幕 · 人声增强默认关闭</div>
         </main>
       </div>
     </div>`;
@@ -183,59 +183,59 @@
     updateActiveCue();
   }
 
-  function supportedAudioSource() {
-    const source = video.currentSrc || video.src;
-    if (!source) return false;
-    try {
-      const url = new URL(source);
-      return url.protocol === 'blob:' || url.origin === location.origin;
-    } catch { return false; }
+  async function voiceRequest(type) {
+    if (!globalThis.chrome?.runtime?.id) throw new Error('请重新加载扩展并刷新课程页面');
+    const reply = await chrome.runtime.sendMessage({ target: 'voice-background', type });
+    if (!reply?.ok) throw new Error(reply?.error || '音频扩展没有响应');
+    return reply.state;
   }
 
   function updateDenoiseButton() {
     const button = $('.icp-denoise');
     const enabled = Boolean(state.audio?.enabled);
-    button.textContent = '轻度降噪：' + (enabled ? '开' : '关');
+    button.textContent = '人声增强：' + (enabled ? '开' : '关');
     button.setAttribute('aria-pressed', String(enabled));
+    button.disabled = state.audioBusy;
+    button.title = state.audio ? '切换增强与原声；工具栏图标可停止捕获' : '首次启用请点击浏览器工具栏的随行播放器图标';
+  }
+
+  function stopVoice() {
+    state.audio = null;
+    updateDenoiseButton();
+    void voiceRequest('stop').catch(() => {});
   }
 
   async function toggleDenoise() {
-    if (!state.audio && !supportedAudioSource()) {
-      status('此视频来源不支持安全的浏览器音频处理，原声播放不受影响。', true);
-      return;
-    }
+    if (state.audioBusy) return;
+    if (panel.hidden || (!video.src && !state.hls)) return status('请先选择并播放一节课程。');
+    state.audioBusy = true;
+    updateDenoiseButton();
+    const token = state.loadToken;
     try {
-      if (!state.audio) {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) throw new Error('当前浏览器不支持音频处理');
-        const context = new AudioContextClass();
-        const source = context.createMediaElementSource(video);
-        const lowCut = context.createBiquadFilter();
-        lowCut.type = 'highpass'; lowCut.frequency.value = 90;
-        const highCut = context.createBiquadFilter();
-        highCut.type = 'lowpass'; highCut.frequency.value = 8000;
-        const dry = context.createGain();
-        const wet = context.createGain();
-        dry.gain.value = 1;
-        wet.gain.value = 0;
-        source.connect(dry).connect(context.destination);
-        source.connect(lowCut).connect(highCut).connect(wet).connect(context.destination);
-        state.audio = { context, dry, wet, enabled: false };
-      }
-      const audio = state.audio;
-      const token = state.loadToken;
-      await audio.context.resume();
-      if (state.audio !== audio || state.loadToken !== token || panel.hidden) return;
-      state.audio.enabled = !state.audio.enabled;
-      const when = state.audio.context.currentTime;
-      state.audio.dry.gain.setTargetAtTime(state.audio.enabled ? 0 : 1, when, 0.02);
-      state.audio.wet.gain.setTargetAtTime(state.audio.enabled ? 1 : 0, when, 0.02);
-      updateDenoiseButton();
-      status(state.audio.enabled ? '轻度降噪已开启：过滤低频轰鸣与高频底噪。' : '轻度降噪已关闭，恢复原声。');
+      const result = await voiceRequest('toggle');
+      if (token !== state.loadToken || panel.hidden) return;
+      state.audio = result.active ? result : null;
+      status(result.enabled ? '人声增强已开启：温和均衡与动态压缩。' : '已切回原声；点击工具栏图标可停止音频捕获。');
     } catch (error) {
-      status('无法开启降噪：' + error.message, true);
+      if (token === state.loadToken && !panel.hidden) status(error.message, true);
+    } finally {
+      state.audioBusy = false;
+      updateDenoiseButton();
     }
   }
+
+  if (globalThis.chrome?.runtime?.id) chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+    if (message?.target !== 'voice-content') return;
+    if (message.type === 'ready') {
+      respond({ ready: !panel.hidden && !video.paused && Boolean(video.src || state.hls), generation: state.loadToken });
+      return;
+    }
+    if (panel.hidden) { if (message.state?.tabId !== null) stopVoice(); return; }
+    state.audio = message.state?.tabId != null ? message.state : null;
+    updateDenoiseButton();
+    if (message.error) status('无法启用人声增强：' + message.error, true);
+    else if (state.audio) status(state.audio.enabled ? '人声增强已开启；请避免页面中的其他播放器同时发声。' : '已切回原声，音频捕获仍在运行。');
+  });
 
   function close() {
     state.loadToken += 1;
@@ -252,6 +252,7 @@
       $('.icp-subtitle-status').textContent = '字幕读取已取消，可重新选择课次';
     }
     video.pause();
+    stopVoice();
     saveProgress();
     if (state.live) {
       resetVideo();
@@ -466,25 +467,9 @@
     state.playController?.abort();
     video.pause();
     if (state.hls) { state.hls.destroy(); state.hls = null; }
-    if (state.audio) {
-      const oldVideo = video;
-      const replacement = document.createElement('video');
-      replacement.className = 'icp-video';
-      replacement.controls = true;
-      replacement.playsInline = true;
-      replacement.preload = 'metadata';
-      oldVideo.removeAttribute('src');
-      oldVideo.load();
-      oldVideo.replaceWith(replacement);
-      video = replacement;
-      void state.audio.context.close();
-      state.audio = null;
-      updateDenoiseButton();
-      bindVideoHandlers();
-    } else {
-      video.removeAttribute('src');
-      video.load();
-    }
+    stopVoice();
+    video.removeAttribute('src');
+    video.load();
     state.restoreAt = 0;
     clearSubtitle();
   }
@@ -679,7 +664,7 @@
     video.addEventListener('error', () => { if (video.src && !panel.hidden) status('视频加载失败。请检查播放权限或重新选择课次。', true); });
   }
   bindVideoHandlers();
-  window.addEventListener('pagehide', () => { cancelProbe(); saveProgress(); state.playController?.abort(); state.courseController?.abort(); });
+  window.addEventListener('pagehide', () => { stopVoice(); cancelProbe(); saveProgress(); state.playController?.abort(); state.courseController?.abort(); });
   document.addEventListener('focusin', (event) => {
     if (!panel.hidden && !panel.contains(event.target)) $('.icp-close').focus();
   });
