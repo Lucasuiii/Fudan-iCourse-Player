@@ -107,3 +107,13 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   job.then(result => respond({ ok: true, result }), error => respond({ ok: false, error: error.message }));
   return true;
 });
+
+// Apply saved course terms to already-open players; no secret is sent to pages.
+chrome.storage?.onChanged?.addListener((changes, area) => {
+  if (area !== 'local' || (!changes.whisperPrompts && !changes.whisperKey)) return;
+  const old = changes.whisperPrompts?.oldValue || {}, next = changes.whisperPrompts?.newValue || {};
+  const courseIds = [...new Set([...Object.keys(old), ...Object.keys(next)])].filter(id => old[id] !== next[id]);
+  void chrome.tabs.query({}).then(tabs => Promise.all(tabs.map(tab => chrome.tabs.sendMessage(tab.id, {
+    target: 'voice-content', type: 'keywords-updated', courseIds, all: Boolean(changes.whisperKey)
+  }).catch(() => {})))).catch(() => {});
+});

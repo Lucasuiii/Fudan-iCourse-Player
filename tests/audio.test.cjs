@@ -148,3 +148,17 @@ test('background advertises local ASR protocol before capture starts', async () 
   assert.equal(reply.state.active, false);
   assert.equal(app.open(), false);
 });
+
+test('Whisper start does not block clock updates and restarting replaces a failed recognizer', async () => {
+ let handler, finish;const sessions=[];
+ class Recognizer{constructor(){sessions.push(this);}start(){return new Promise(r=>finish=r);}setClock(c){this.clock=c;}close(){this.closed=true;}fail(){this.closed=true;}}
+ const context={state:'running',destination:{},resume:async()=>{},close:async()=>{},createMediaStreamSource:()=>({})};
+ const chrome={runtime:{id:'test',onMessage:{addListener:f=>handler=f},sendMessage:async()=>{}}};
+ const stream={getAudioTracks:()=>[{addEventListener(){}}],getTracks:()=>[{stop(){}}]};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../offscreen.js'),'utf8'),{chrome,AudioContext:class{constructor(){return context;}},navigator:{mediaDevices:{getUserMedia:async()=>stream}},ICourseVoice:{createVoiceGraph:()=>({setEnabled(){},disconnect(){}})},ICourseWhisperStream:{WhisperStream:Recognizer}});
+ const send=(type,fields={})=>new Promise(r=>handler({target:'voice-offscreen',type,tabId:1,...fields},{id:'test'},r));
+ const first={epoch:1,time:0,rate:1,paused:false};
+ assert.equal((await send('start',{streamId:'x',asr:true,engine:'whisper',clock:first})).ok,true);
+ const newer={epoch:2,time:10,rate:2,paused:false};await send('clock',{clock:newer});finish();await tick();assert.deepEqual(sessions[0].clock,newer);
+ sessions[0].fail();await send('asr',{enabled:true,engine:'whisper',clock:newer});assert.equal(sessions.length,2);assert.equal(sessions[1].closed,undefined);finish();await tick();await send('stop');
+});
