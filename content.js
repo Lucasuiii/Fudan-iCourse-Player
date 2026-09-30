@@ -187,10 +187,7 @@
   }
 
   async function voiceRequest(type, fields = {}) {
-    if (!globalThis.chrome?.runtime?.id) throw new Error('请重新加载扩展并刷新课程页面');
-    const reply = await chrome.runtime.sendMessage({ target: 'voice-background', type, ...fields });
-    if (!reply?.ok) throw new Error(reply?.error || '音频扩展没有响应');
-    return reply.state;
+    return core.voiceRequest(globalThis.chrome?.runtime, type, fields);
   }
 
   function mediaClock() {

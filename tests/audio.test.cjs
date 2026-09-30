@@ -140,3 +140,11 @@ test('a failed output resume stops capture so original tab audio can recover', a
   assert.equal(app.state().tabId, null);
   assert.equal(app.open(), false);
 });
+
+test('background advertises local ASR protocol before capture starts', async () => {
+  const app = background();
+  const reply = await app.message('state');
+  assert.equal(reply.asrProtocol, 1);
+  assert.equal(reply.state.active, false);
+  assert.equal(app.open(), false);
+});

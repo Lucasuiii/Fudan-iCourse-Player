@@ -73,7 +73,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     }
     return { ...state, active: state.tabId === tabId };
   });
-  job.then((state) => respond({ ok: true, state }), (error) => respond({ ok: false, error: error.message }));
+  job.then((state) => respond({ ok: true, asrProtocol: 1, state }), (error) => respond({ ok: false, error: error.message }));
   return true;
 });
 chrome.tabs.onRemoved.addListener((tabId) => { void serialized(() => stopTab(tabId)).catch(() => {}); });
