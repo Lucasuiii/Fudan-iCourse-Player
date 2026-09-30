@@ -13,7 +13,7 @@ jobs:
         with:
           node-version: '22'
       - run: node --check core.js
-      - run: node --check whisper-prefetch.js
+      - run: node --check whisper-stream.js
       - run: node --check options.js
       - run: python3 -m py_compile local-whisper/*.py
       - run: python3 -m unittest discover -s local-whisper -p "test_*.py"
@@ -21,9 +21,6 @@ jobs:
       - run: node --check background.js
       - run: node --check offscreen.js
       - run: node --check voice.js
-      - run: node --check asr-session.js
-      - run: node --check asr-worker.js
       - run: node --check pcm-worklet.js
-      - run: python3 -m py_compile scripts/install-asr.py
       - run: node --test tests/*.test.cjs
       - run: git diff --check
