@@ -155,3 +155,6 @@
 
 #icp-panel .icp-course .icp-resource-status{font-size:10px;line-height:1.6;margin-top:4px;white-space:normal}
 #icp-panel .icp-probe-retry{justify-self:start;padding:5px 9px;border:1px solid var(--icp-line);border-radius:8px;background:var(--icp-control);color:var(--icp-accent);font-size:11px}
+
+#icp-panel .icp-local-caption{position:absolute;z-index:5;left:8%;right:8%;bottom:58px;width:fit-content;max-width:84%;margin:auto;padding:7px 14px;border-radius:10px;background:#000b;color:white;font-size:clamp(16px,2vw,26px);line-height:1.5;text-align:center;pointer-events:none;text-shadow:0 1px 2px #000}
+#icp-panel .icp-local-caption[hidden]{display:none}

@@ -38,7 +38,7 @@ chrome.action.onClicked.addListener((tab) => {
         url: 'offscreen.html', reasons: ['USER_MEDIA'], justification: '本地处理用户启动的课程标签页音频并回放，不录制或上传'
       });
       const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
-      const result = await audio('start', { tabId: tab.id, streamId });
+      const result = await audio('start', { tabId: tab.id, streamId, asr: ready.asr, clock: ready.clock });
       // The panel may have closed or changed lectures while capture was starting.
       const stillReady = await chrome.tabs.sendMessage(tab.id, { target: 'voice-content', type: 'ready' });
       if (!stillReady?.ready || stillReady.generation !== ready.generation) { await stopTab(tab.id); return; }
@@ -54,11 +54,16 @@ chrome.action.onClicked.addListener((tab) => {
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message?.target !== 'voice-background' || sender.id !== chrome.runtime.id) return;
   const fromOffscreen = sender.url === chrome.runtime.getURL('offscreen.html') && !sender.tab;
-  if (!sender.tab && !(fromOffscreen && message.type === 'ended')) return;
+  if (!sender.tab && !(fromOffscreen && ['ended', 'asr-event'].includes(message.type))) return;
+  if (message.type === 'asr-event' && fromOffscreen) {
+    void chrome.tabs.sendMessage(message.tabId, { target: 'voice-content', event: message.event }).catch(() => {});
+    return;
+  }
   const tabId = sender.tab?.id ?? message.tabId;
-  if (!['state', 'toggle', 'stop', 'ended'].includes(message.type)) return;
+  if (!['state', 'toggle', 'stop', 'ended', 'asr', 'clock'].includes(message.type)) return;
   const job = serialized(async () => {
     if (message.type === 'stop' || message.type === 'ended') return stopTab(tabId);
+    if (message.type === 'clock' || message.type === 'asr') return audio(message.type, { tabId, clock: message.clock, enabled: Boolean(message.enabled) });
     let state = await audio('state');
     if (message.type === 'toggle') {
       if (state.tabId !== tabId) throw new Error('首次启用：请点击浏览器工具栏的随行播放器图标');

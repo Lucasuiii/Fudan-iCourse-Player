@@ -4,3 +4,7 @@ outputs/
 .playwright-cli/
 node_modules/
 *.zip
+vendor/sherpa/*.wasm
+vendor/sherpa/*.data
+__pycache__/
+*.pyc

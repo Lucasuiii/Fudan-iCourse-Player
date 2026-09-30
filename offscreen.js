@@ -1,4 +1,4 @@
-/* global ICourseVoice */
+/* global ICourseVoice, ICourseASR */
 'use strict';
 let session = null;
 let queue = Promise.resolve();
@@ -9,11 +9,26 @@ async function stop() {
   const old = session;
   session = null;
   if (!old) return;
+  old.asr?.close();
   old.stream.getTracks().forEach((track) => track.stop());
   old.graph.disconnect();
   await old.context.close();
 }
+async function configureASR(enabled, clock) {
+  session.asr?.close(); session.asr = null;
+  if (!enabled) return;
+  const owner = session;
+  const asr = new ICourseASR.ASRSession(owner.context, owner.source, (event) => {
+    if (session !== owner) return;
+    void chrome.runtime.sendMessage({ target: 'voice-background', type: 'asr-event', tabId: owner.tabId, event }).catch(() => {});
+  });
+  owner.asr = asr;
+  try { await asr.start(); if (clock) asr.setClock(clock); }
+  catch (error) { asr.fail(error.message); }
+}
 async function handle(message) {
+  if (message.type === 'clock') { if (session?.tabId === message.tabId) { session.clock = message.clock; session.asr?.setClock(message.clock); } return snapshot(); }
+  if (message.type === 'asr') { if (session?.tabId === message.tabId) await configureASR(message.enabled, message.clock); return snapshot(); }
   if (message.type === 'state') return snapshot();
   if (message.type === 'stop') {
     if (session?.tabId === message.tabId) await stop();
@@ -40,8 +55,9 @@ async function handle(message) {
     graph = ICourseVoice.createVoiceGraph(context, source);
     await context.resume();
     if (context.state !== 'running') throw new Error('浏览器未能启动音频输出');
-    session = { stream, context, graph, tabId: message.tabId, enabled: true };
+    session = { stream, context, graph, source, clock: message.clock, asr: null, tabId: message.tabId, enabled: true };
     graph.setEnabled(true);
+    if (message.asr) await configureASR(true, message.clock);
     stream.getAudioTracks().forEach((track) => track.addEventListener('ended', () => {
       if (session?.stream !== stream) return;
       queue = queue.then(async () => {
