@@ -200,5 +200,24 @@
     return 'WEBVTT\n\n' + cues.map((cue) => stamp(cue.start) + ' --> ' + stamp(cue.end) + '\n' + cue.text.replace(/-->/g, '→').replace(/[<>]/g, '') + '\n').join('\n');
   }
 
-  root.ICourseCore = { context, vpnUrl, courseIdFromUrl, api, parseCourse, hasLectureStarted, selectVideo, selectLive, probeLecture, signVideo, subtitleCues, subtitleVtt };
+  async function voiceRequest(runtime, type, fields = {}) {
+    const reload = '请在扩展管理页重新加载随行播放器，再刷新课程页面';
+    if (!runtime?.id) throw new Error(reload);
+    const send = async (operation, data = {}) => {
+      let reply;
+      try { reply = await runtime.sendMessage({ target: 'voice-background', type: operation, ...data }); }
+      catch (error) { throw new Error('音频扩展连接失败：' + error.message + '；' + reload); }
+      if (!reply) throw new Error('音频扩展没有响应；' + reload);
+      if (!reply.ok) throw new Error(reply.error || '音频扩展操作失败');
+      return reply;
+    };
+    // A refreshed page can run newer code while Chrome still has the old worker.
+    if (type === 'asr' && fields.enabled) {
+      const capability = await send('state');
+      if (capability.asrProtocol !== 1) throw new Error('扩展后台不支持本地识别或尚未完成更新；' + reload);
+    }
+    return (await send(type, fields)).state;
+  }
+
+  root.ICourseCore = { context, vpnUrl, courseIdFromUrl, api, parseCourse, hasLectureStarted, selectVideo, selectLive, probeLecture, signVideo, subtitleCues, subtitleVtt, voiceRequest };
 })(globalThis);
