@@ -38,7 +38,7 @@ chrome.action.onClicked.addListener((tab) => {
         url: 'offscreen.html', reasons: ['USER_MEDIA'], justification: '本地处理用户启动的课程标签页音频并回放，不录制或上传'
       });
       const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
-      const result = await audio('start', { tabId: tab.id, streamId, asr: ready.asr, clock: ready.clock });
+      const result = await audio('start', { tabId: tab.id, streamId, asr: ready.asr, clock: ready.clock, engine: ready.engine, courseId: ready.courseId });
       // The panel may have closed or changed lectures while capture was starting.
       const stillReady = await chrome.tabs.sendMessage(tab.id, { target: 'voice-content', type: 'ready' });
       if (!stillReady?.ready || stillReady.generation !== ready.generation) { await stopTab(tab.id); return; }
@@ -63,7 +63,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (!['state', 'toggle', 'stop', 'ended', 'asr', 'clock'].includes(message.type)) return;
   const job = serialized(async () => {
     if (message.type === 'stop' || message.type === 'ended') return stopTab(tabId);
-    if (message.type === 'clock' || message.type === 'asr') return audio(message.type, { tabId, clock: message.clock, enabled: Boolean(message.enabled) });
+    if (message.type === 'clock' || message.type === 'asr') return audio(message.type, { tabId, clock: message.clock, enabled: Boolean(message.enabled), engine: message.engine, courseId: message.courseId });
     let state = await audio('state');
     if (message.type === 'toggle') {
       if (state.tabId !== tabId) throw new Error('首次启用：请点击浏览器工具栏的随行播放器图标');
@@ -84,18 +84,20 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
 // Separate queue: model inference must never block voice cleanup or tab capture.
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message?.target !== 'whisper-background' || sender.id !== chrome.runtime.id) return;
+  const streaming = sender.url === chrome.runtime.getURL('offscreen.html') && !sender.tab;
   const options = sender.url === chrome.runtime.getURL('options.html') && !sender.tab;
-  if (!sender.tab && !options) return;
-  if (!['chunk', 'health', 'settings'].includes(message.type) || (options && message.type === 'chunk')) return;
+  if (!sender.tab && !options && !streaming) return;
+  if (!['chunk', 'stream', 'health', 'settings'].includes(message.type) || (options && !['health','settings'].includes(message.type)) || (streaming && !['health','stream'].includes(message.type)) || (message.type === 'stream' && !streaming)) return;
   const job = (async () => {
+    if (streaming && message.type === 'stream' && (await audio('state')).tabId === null) throw Error('音频捕获已停止');
     if (message.type === 'settings') { if (/^\d{1,10}$/.test(message.courseId || '')) await chrome.storage.local.set({ whisperCourseId: message.courseId }); await chrome.runtime.openOptionsPage(); return {}; }
     const { whisperKey, whisperPrompts } = await chrome.storage.local.get(['whisperKey', 'whisperPrompts']);
     const whisperPrompt = /^\d{1,10}$/.test(message.courseId || '') ? whisperPrompts?.[message.courseId] : '';
     if (!whisperKey) throw Error('请先点“Whisper 设置”，填写本地服务连接密钥');
-    const response = await fetch('http://127.0.0.1:8766/' + (message.type === 'chunk' ? 'chunk' : 'health'), {
-      method: message.type === 'chunk' ? 'POST' : 'GET',
+    const response = await fetch('http://127.0.0.1:8766/' + (message.type === 'chunk' ? 'chunk' : message.type === 'stream' ? 'stream' : 'health'), {
+      method: message.type === 'health' ? 'GET' : 'POST',
       headers: { Authorization: 'Bearer ' + whisperKey, 'Content-Type': 'application/json' },
-      ...(message.type === 'chunk' ? { body: JSON.stringify({ source: message.chunk?.source, start: message.chunk?.start, duration: message.chunk?.duration, ...(whisperPrompt ? { prompt: whisperPrompt } : {}) }) } : {}),
+      ...(message.type === 'stream' ? {body: JSON.stringify({samples:message.samples, ...(whisperPrompt ? {prompt:whisperPrompt} : {})})} : message.type === 'chunk' ? { body: JSON.stringify({ source: message.chunk?.source, start: message.chunk?.start, duration: message.chunk?.duration, ...(whisperPrompt ? { prompt: whisperPrompt } : {}) }) } : {}),
       signal: AbortSignal.timeout(180000)
     }).catch(() => { throw Error('无法连接本地 Whisper 服务，请确认服务正在运行'); });
     const result = await response.json();

@@ -26,7 +26,7 @@
         <main class="icp-main"><div class="icp-stage"><video class="icp-video" controls playsinline preload="metadata"></video><div class="icp-local-caption" hidden></div><div class="icp-placeholder"><span>▶</span><strong>选择一节课次，开始观看</strong><small>你的课程 · 更舒服的播放体验</small></div><div class="icp-tap-target" role="button" tabindex="0" aria-label="点击暂停或继续播放"></div></div>
           <div class="icp-now"><div><small>当前课次</small><strong class="icp-now-title">等待选择课次</strong></div><span class="icp-date"></span></div>
           <div class="icp-tools" aria-label="播放控制"><div class="icp-toolgroup"><button class="icp-sidebar-toggle" type="button" aria-expanded="true" aria-controls="icp-sidebar">收起侧栏</button><button class="icp-play" type="button" aria-label="播放课程">播放</button><button class="icp-back" type="button" title="后退 10 秒">↶ <span>10 秒</span></button><button class="icp-forward" type="button" title="前进 10 秒"><span>10 秒</span> ↷</button><button class="icp-go-live" type="button" hidden>● 回到直播</button></div><div class="icp-toolgroup"><label>速度 <select class="icp-speed" aria-label="播放速度"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option><option value="2.5">2.5×</option><option value="3">3×</option></select></label><button class="icp-captions" type="button" aria-pressed="false" disabled>字幕：暂无</button><button class="icp-full" type="button">全屏</button><button class="icp-more-toggle" type="button" aria-expanded="false" aria-controls="icp-more">更多 ···</button></div></div>
-          <section class="icp-more" id="icp-more" aria-label="更多播放设置" hidden><div class="icp-toolgroup"><label>来源 <select class="icp-caption-source" aria-label="字幕来源"><option value="platform">平台字幕</option><option value="whisper">Whisper 预取（实验）</option><option value="local">轻量实时识别（实验）</option></select></label><button class="icp-whisper-settings" type="button">Whisper 设置</button><button class="icp-whisper-retry" type="button" hidden>重新准备字幕</button><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button><button class="icp-pip" type="button">画中画</button></div><div class="icp-caption-options"><label>字幕字号 <select class="icp-caption-size"><option value="small">小</option><option value="medium" selected>标准</option><option value="large">大</option></select></label><label>字幕背景 <select class="icp-caption-background"><option value="soft">浅</option><option value="medium" selected>标准</option><option value="solid">深</option></select></label><label>字幕位置 <select class="icp-caption-position"><option value="bottom" selected>下方</option><option value="top">上方</option></select></label></div></section>
+          <section class="icp-more" id="icp-more" aria-label="更多播放设置" hidden><div class="icp-toolgroup"><label>来源 <select class="icp-caption-source" aria-label="字幕来源"><option value="platform">平台字幕</option><option value="whisper">Whisper 预取（实验）</option><option value="whisper-live">Whisper 流式（实验）</option><option value="local">轻量实时识别（实验）</option></select></label><button class="icp-whisper-settings" type="button">Whisper 设置</button><button class="icp-whisper-retry" type="button" hidden>重新准备字幕</button><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button><button class="icp-pip" type="button">画中画</button></div><div class="icp-caption-options"><label>字幕字号 <select class="icp-caption-size"><option value="small">小</option><option value="medium" selected>标准</option><option value="large">大</option></select></label><label>字幕背景 <select class="icp-caption-background"><option value="soft">浅</option><option value="medium" selected>标准</option><option value="solid">深</option></select></label><label>字幕位置 <select class="icp-caption-position"><option value="bottom" selected>下方</option><option value="top">上方</option></select></label></div></section>
           <div class="icp-hint">空格播放/暂停 · ←/→ 快退/快进 · F 全屏 · P 画中画 · C 字幕 · 人声增强默认关闭</div>
         </main>
       </div>
@@ -199,7 +199,7 @@
     const fragment = document.createDocumentFragment();
     list.replaceChildren();
     empty.hidden = state.cues.length > 0;
-    if (!state.cues.length) empty.textContent = state.captionSource === 'whisper' ? 'Whisper 正在准备当前位置字幕；识别完成后在这里显示' : state.captionSource === 'local' ? '本地字幕将从启用后开始积累' : state.live ? '直播暂无官方字幕' : '这节课暂无官方字幕';
+    if (!state.cues.length) empty.textContent = state.captionSource === 'whisper' ? 'Whisper 正在准备当前位置字幕；识别完成后在这里显示' : isStreaming() ? '本地字幕将从启用后开始积累' : state.live ? '直播暂无官方字幕' : '这节课暂无官方字幕';
     const query = $('.icp-transcript-filter').value.trim().toLowerCase();
     for (const [index, cue] of state.cues.entries()) {
       if (query && !cue.text.toLowerCase().includes(query)) continue;
@@ -237,11 +237,12 @@
     return core.voiceRequest(globalThis.chrome?.runtime, type, fields);
   }
 
+  function isStreaming() { return ['local', 'whisper-live'].includes(state.captionSource); }
   function mediaClock() {
     return { epoch: state.asrEpoch, time: video.currentTime, paused: video.paused || video.seeking || panel.hidden, rate: video.playbackRate };
   }
   function syncASRClock(reset = false) {
-    if (state.captionSource !== 'local') return;
+    if (!isStreaming()) return;
     if (reset) { state.asrEpoch++; $('.icp-local-caption').textContent = ''; $('.icp-local-caption').hidden = true; }
     void voiceRequest('clock', { clock: mediaClock() }).catch(() => {});
     if (video.playbackRate !== 1) $('.icp-subtitle-status').textContent = '本地识别仅支持 1×，请切回原速';
@@ -251,7 +252,7 @@
     stopWhisper();
     state.captionSource = $('.icp-caption-source').value;
     state.asrEpoch++;
-    const local = state.captionSource === 'local';
+    const local = isStreaming();
     if (state.captionSource === 'whisper') {
       state.captionOn = true; if (video.textTracks[0]) video.textTracks[0].mode = 'disabled';
       void voiceRequest('asr', { enabled: false }).catch(() => {});
@@ -265,7 +266,7 @@
     if (local) state.captionOn = true;
     updateCaptionButton(); renderTranscript();
     $('.icp-subtitle-status').textContent = local ? '本地识别待启动 · 请播放课程并点击工具栏图标' : state.platformCues.length + ' 条平台字幕';
-    try { await voiceRequest('asr', { enabled: local, clock: mediaClock() }); }
+    try { await voiceRequest('asr', { enabled: local, clock: mediaClock(), engine: state.captionSource === 'whisper-live' ? 'whisper' : 'light', courseId: state.currentCourseId || state.courseId }); }
     catch (error) { if (local) $('.icp-subtitle-status').textContent = error.message; }
   }
   async function whisperMessage(type, chunk) {
@@ -348,10 +349,10 @@
   }
 
   function receiveASR(event) {
-    if (state.captionSource !== 'local' || panel.hidden) return;
+    if (!isStreaming() || panel.hidden) return;
     const label = $('.icp-subtitle-status');
     if (event.type === 'error') { $('.icp-local-caption').hidden = true; label.textContent = '本地识别停止：' + event.error; return; }
-    if (event.type === 'loading') { label.textContent = '正在加载本地中文模型…'; return; }
+    if (event.type === 'loading') { label.textContent = state.captionSource === 'whisper-live' ? '正在连接 Whisper 流式模型…' : '正在加载本地中文模型…'; return; }
     if (event.type === 'ready') { label.textContent = video.playbackRate === 1 ? '本地识别已就绪' : '本地识别仅支持 1×，请切回原速'; return; }
     if (event.type !== 'text' || event.epoch !== state.asrEpoch) return;
     const overlay = $('.icp-local-caption');
@@ -360,7 +361,7 @@
     overlay.textContent = chars.length > limit ? '…' + chars.slice(-limit).join('') : event.text;
     overlay.title = event.text;
     overlay.hidden = !state.captionOn;
-    label.textContent = event.final ? '本地识别 · 已断句' : '本地识别 · 实时草稿';
+    label.textContent = (state.captionSource === 'whisper-live' ? 'Whisper 流式' : '本地识别') + (event.final ? ' · 已断句' : ' · 实时草稿');
     if (event.final) {
       state.localCues.push({ start: event.start, end: Math.max(event.start + 0.1, event.end), text: event.text });
       if (state.localCues.length > 500) state.localCues.shift();
@@ -408,12 +409,12 @@
     if (message?.target !== 'voice-content') return;
     if (message.event) { receiveASR(message.event); return; }
     if (message.type === 'ready') {
-      respond({ asr: state.captionSource === 'local', clock: mediaClock(), ready: !panel.hidden && !video.paused && Boolean(video.src || state.hls), generation: state.loadToken });
+      respond({ asr: isStreaming(), engine: state.captionSource === 'whisper-live' ? 'whisper' : 'light', courseId: state.currentCourseId || state.courseId, clock: mediaClock(), ready: !panel.hidden && !video.paused && Boolean(video.src || state.hls), generation: state.loadToken });
       return;
     }
     if (panel.hidden) { if (message.state?.tabId !== null) stopVoice(); return; }
     state.audio = message.state?.tabId != null ? message.state : null;
-    if (!state.audio && state.captionSource === 'local') { $('.icp-local-caption').hidden = true; $('.icp-subtitle-status').textContent = '本地识别已停止 · 工具栏图标可重新启动'; }
+    if (!state.audio && isStreaming()) { $('.icp-local-caption').hidden = true; $('.icp-subtitle-status').textContent = '本地识别已停止 · 工具栏图标可重新启动'; }
     updateDenoiseButton();
     if (message.error) status('无法启用人声增强：' + message.error, true);
     else if (state.audio) status(state.audio.enabled ? '人声增强已开启；请避免页面中的其他播放器同时发声。' : '已切回原声，音频捕获仍在运行。');
@@ -790,7 +791,7 @@
       if (state.loadToken !== token) return;
       state.captionsLoading = false;
       state.platformCues = core.subtitleCues(data);
-      state.cues = state.captionSource === 'local' ? state.localCues : state.captionSource === 'whisper' ? (whisper?.cues() || []) : state.platformCues;
+      state.cues = isStreaming() ? state.localCues : state.captionSource === 'whisper' ? (whisper?.cues() || []) : state.platformCues;
       updateCaptionButton();
       renderTranscript();
       if (!state.platformCues.length) { if (state.captionSource === 'platform') $('.icp-subtitle-status').textContent = '暂无平台字幕'; return; }
@@ -842,7 +843,7 @@
     });
     video.addEventListener('timeupdate', () => {
       updateActiveCue(); drawWhisper();
-      if (state.captionSource === 'local' && state.audio && Math.abs(video.currentTime - (state.asrLastClock || 0)) > 1) { state.asrLastClock = video.currentTime; syncASRClock(); }
+      if (isStreaming() && state.audio && Math.abs(video.currentTime - (state.asrLastClock || 0)) > 1) { state.asrLastClock = video.currentTime; syncASRClock(); }
       if (Math.abs(video.currentTime - state.lastSaved) >= 5) saveProgress();
     });
     video.addEventListener('pause', () => {

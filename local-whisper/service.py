@@ -3,6 +3,9 @@
 No cookies are copied; source URLs and raw audio are not persisted in the cache.
 """
 import argparse
+import io
+import struct
+import wave
 import hashlib
 import hmac
 import json
@@ -110,6 +113,29 @@ class Engine:
             return None
         return path, offset, duration
 
+    def stream(self, samples, prompt=PROMPT):
+        if not isinstance(samples, list) or not 32000 <= len(samples) <= 256000:
+            raise ValueError('流式音频必须为 2–16 秒的 16 kHz 单声道 PCM')
+        if any(isinstance(x, bool) or not isinstance(x, int) or not -32768 <= x <= 32767 for x in samples):
+            raise ValueError('PCM 采样无效')
+        if not isinstance(prompt, str) or len(prompt) > 800:
+            raise ValueError('术语提示太长')
+        if not self.lock.acquire(timeout=15): raise RuntimeError('Whisper 正忙，请停止录播预取后重试流式识别')
+        try:
+            began = time.monotonic()
+            audio = io.BytesIO()
+            with wave.open(audio, 'wb') as wav:
+                wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(16000)
+                wav.writeframes(struct.pack('<' + str(len(samples)) + 'h', *samples))
+            body, content_type = multipart(audio.getvalue(), prompt)
+            try:
+                with urlopen(Request(self.inference, data=body, headers={'Content-Type': content_type}), timeout=30) as response:
+                    decoded = json.load(response)
+            except Exception: raise RuntimeError('Whisper 流式推理失败，请检查本地服务') from None
+            cues = normalize_segments(decoded.get('segments', []), 0, 0, len(samples) / 16000)
+            return {'text': ''.join(c['text'] for c in cues), 'seconds': round(time.monotonic() - began, 3)}
+        finally: self.lock.release()
+
     def chunk(self, source, start, duration, prompt=PROMPT):
         validate_source(source)
         if isinstance(start, bool) or not isinstance(start, int) or start < 0 or start % CHUNK or start > 86400:
@@ -183,12 +209,12 @@ def handler(engine, token, port):
             self.send(200, {'model': engine.model.name, 'chunkSeconds': CHUNK, 'rtf': engine.last_rtf})
         def do_POST(self):
             if not self.authorized(): return self.send(403, {'error': '本地连接密钥无效'})
-            if self.path != '/chunk': return self.send(404, {'error': '未知请求'})
+            if self.path not in ('/chunk', '/stream'): return self.send(404, {'error': '未知请求'})
             try:
                 size = int(self.headers.get('Content-Length', '0'))
-                if not 0 < size <= 16384: raise ValueError('请求大小无效')
+                if not 0 < size <= (2000000 if self.path == '/stream' else 16384): raise ValueError('请求大小无效')
                 data = json.loads(self.rfile.read(size))
-                result = engine.chunk(data.get('source'), data.get('start'), data.get('duration'), data.get('prompt', PROMPT))
+                result = engine.stream(data.get('samples'), data.get('prompt', PROMPT)) if self.path == '/stream' else engine.chunk(data.get('source'), data.get('start'), data.get('duration'), data.get('prompt', PROMPT))
                 self.send(200, result)
             except (ValueError, TypeError, json.JSONDecodeError) as error: self.send(400, {'error': str(error)})
             except RuntimeError as error: self.send(503, {'error': str(error)})

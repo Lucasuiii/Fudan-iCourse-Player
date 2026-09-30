@@ -23,3 +23,11 @@ test('optional course glossary never affects another course or trusts caller pro
  const a=app();await a.send({type:'chunk',courseId:'22',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:20,duration:100,prompt:'无关的术语'}});
  assert.deepEqual(JSON.parse(a.calls[0].init.body),{source:'https://icourse.fudan.edu.cn/a.mp4',start:20,duration:100});
 });
+test('PCM inference accepts only the extension offscreen owner with active capture',async()=>{
+ const a=app();assert.equal(await a.send({type:'stream',samples:[0]}),null);
+ a.chrome.runtime.getContexts=async()=>[{}];a.chrome.runtime.sendMessage=async()=>({ok:true,state:{tabId:1}});
+ const reply=await a.send({type:'stream',samples:[0]},{id:'own',url:'chrome-extension://own/offscreen.html'});
+ assert.equal(reply.ok,true);assert.equal(a.calls[0].url,'http://127.0.0.1:8766/stream');
+ a.chrome.runtime.sendMessage=async()=>({ok:true,state:{tabId:null}});
+ assert.match((await a.send({type:'stream',samples:[0]},{id:'own',url:'chrome-extension://own/offscreen.html'})).error,/停止/);
+});

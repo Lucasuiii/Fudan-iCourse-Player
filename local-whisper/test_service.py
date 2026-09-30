@@ -6,6 +6,11 @@ import unittest
 spec=importlib.util.spec_from_file_location('service',Path(__file__).with_name('service.py'))
 s=importlib.util.module_from_spec(spec);spec.loader.exec_module(s)
 class ServiceTests(unittest.TestCase):
+ def test_stream_rejects_invalid_pcm_before_inference(self):
+  e=object.__new__(s.Engine)
+  for samples in [None, [], [0]*31999, [0]*256001, [True]*32000, [32768]*32000]:
+   with self.assertRaises(ValueError):e.stream(samples)
+
  def test_source_rejects_untrusted_and_live(self):
   for url in ['http://icourse.fudan.edu.cn/a.mp4','https://127.0.0.1/a.mp4','https://icourse.fudan.edu.cn.evil.com/a.mp4','https://icourse.fudan.edu.cn/a.m3u8','https://user:pass@icourse.fudan.edu.cn/a.mp4','https://icourse.fudan.edu.cn:8888/a.mp4']:
    with self.assertRaises(ValueError):s.validate_source(url)
