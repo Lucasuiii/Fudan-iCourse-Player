@@ -8,9 +8,15 @@ function serialized(task) {
 async function hasOffscreen() {
   return (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'], documentUrls: [chrome.runtime.getURL('offscreen.html')] })).length > 0;
 }
+async function whisperConfig(courseId) {
+  const { whisperKey, whisperPrompts } = await chrome.storage.local.get(['whisperKey', 'whisperPrompts']);
+  if (!whisperKey) throw Error('请在“关键词与连接”保存本地服务密钥');
+  return { key: whisperKey, prompt: /^\d{1,10}$/.test(courseId || '') ? (whisperPrompts?.[courseId] || '') : '' };
+}
 async function audio(type, fields = {}) {
   if (!await hasOffscreen()) return { tabId: null, enabled: false };
-  const reply = await chrome.runtime.sendMessage({ target: 'voice-offscreen', type, ...fields });
+  const config = ((type === 'start' && fields.asr) || (type === 'asr' && fields.enabled)) ? await whisperConfig(fields.courseId) : undefined;
+  const reply = await chrome.runtime.sendMessage({ target: 'voice-offscreen', type, ...fields, ...(config ? { config } : {}) });
   if (!reply?.ok) throw new Error(reply?.error || '音频页面没有响应');
   return reply.state;
 }

@@ -7,20 +7,21 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 function event() { const listeners = []; return { addListener(fn) { listeners.push(fn); }, fn(...args) { let pending = false; for (const fn of listeners) pending = fn(...args) === true || pending; return pending; } }; }
 function background() {
   let open = false, current = { tabId: null, enabled: false };
-  const notices = [], calls = [];
+  const notices = [], calls = [], messages = [];
   const ready = { ready: true, generation: 1 };
   const chrome = {
     runtime: {
       id: 'test', getURL: p => 'chrome-extension://test/' + p, onMessage: event(),
       getContexts: async () => open ? [{}] : [],
       sendMessage: async message => {
-        calls.push(message.type);
+        calls.push(message.type); messages.push(message);
         if (message.type === 'start') current = { tabId: message.tabId, enabled: true };
         if (message.type === 'stop' && current.tabId === message.tabId) current = { tabId: null, enabled: false };
         if (message.type === 'toggle') current.enabled = !current.enabled;
         return { ok: true, state: { ...current } };
       }
     },
+    storage: { local: { get: async () => ({ whisperKey: 'private-key', whisperPrompts: { '11': 'QR 分解' } }) } },
     offscreen: { createDocument: async () => { open = true; }, closeDocument: async () => { open = false; } },
     tabCapture: { getMediaStreamId: async () => 'stream' },
     action: { onClicked: event(), setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {} },
@@ -37,7 +38,7 @@ function background() {
   const message = (type, tabId = 1, sender = { id: 'test', tab: { id: tabId } }) => new Promise(resolve => {
     if (!chrome.runtime.onMessage.fn({ target: 'voice-background', type }, sender, resolve)) resolve(null);
   });
-  return { chrome, click, message, ready, notices, calls, state: () => current, open: () => open };
+  return { chrome, click, message, ready, notices, calls, messages, state: () => current, open: () => open };
 }
 test('toolbar capture toggles enhancement and stops without leaving an offscreen document', async () => {
   const app = background();
@@ -161,4 +162,10 @@ test('Whisper start does not block clock updates and restarting replaces a faile
  assert.equal((await send('start',{streamId:'x',asr:true,engine:'whisper',clock:first})).ok,true);
  const newer={epoch:2,time:10,rate:2,paused:false};await send('clock',{clock:newer});finish();await tick();assert.deepEqual(sessions[0].clock,newer);
  sessions[0].fail();await send('asr',{enabled:true,engine:'whisper',clock:newer});assert.equal(sessions.length,2);assert.equal(sessions[1].closed,undefined);finish();await tick();await send('stop');
+});
+
+test('capture forwards trusted course configuration only to the extension offscreen page', async () => {
+ const a=background();Object.assign(a.ready,{asr:true,courseId:'11'});await a.click();
+ const start=a.messages.find(m=>m.type==='start');assert.equal(start.target,'voice-offscreen');assert.equal(start.config.key,'private-key');assert.equal(start.config.prompt,'QR 分解');
+ assert.equal(JSON.stringify(a.notices).includes('private-key'),false);assert.equal(JSON.stringify(a.notices).includes('QR 分解'),false);await a.click();
 });

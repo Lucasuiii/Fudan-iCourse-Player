@@ -196,7 +196,7 @@
 #icp-panel .icp-course-id{width:160px}
 #icp-panel .icp-statusbar{padding:6px 20px 10px;min-height:26px}
 #icp-panel .icp-main{padding:12px;gap:0}
-#icp-panel .icp-tools{order:-2;position:sticky;top:0;bottom:auto;margin:0 0 12px;padding:8px 10px;border:1px solid var(--icp-line);border-radius:14px;background:var(--icp-surface-strong);box-shadow:none;z-index:6;gap:8px}
+#icp-panel .icp-tools{order:-2;position:static;top:auto;bottom:auto;margin:0 0 12px;padding:8px 10px;border:1px solid var(--icp-line);border-radius:14px;background:var(--icp-surface-strong);box-shadow:none;z-index:6;gap:8px}
 #icp-panel .icp-toolgroup button,#icp-panel .icp-toolgroup label{border-radius:10px;min-height:34px;padding:0 10px;box-shadow:none}
 #icp-panel .icp-more-toggle[aria-expanded="true"]{color:var(--icp-accent);background:var(--icp-accent-soft)}
 #icp-panel .icp-more{order:-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin:0 0 12px;padding:16px;border:1px solid var(--icp-line);border-radius:14px;background:var(--icp-control)}

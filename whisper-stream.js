@@ -2,8 +2,8 @@
 (function(root) {
   'use strict';
   class WhisperStream {
-    constructor(context, source, emit, courseId) {
-      Object.assign(this, {context, source, emit, courseId, closed:false, busy:false, blocks:[], count:0, revision:0, segment:0});
+    constructor(context, source, emit, courseId, config) {
+      Object.assign(this, {context, source, emit, courseId, config, closed:false, busy:false, blocks:[], count:0, revision:0, segment:0});
       this.clock={epoch:0,time:0,paused:true,rate:1}; this.stamp=performance.now();
     }
     async start() {
@@ -18,9 +18,25 @@
       this.emit({type:'ready'});
     }
     async request(type, fields={}) {
-      const reply=await chrome.runtime.sendMessage({target:'whisper-background',type,courseId:this.courseId,...fields});
-      if(!reply?.ok)throw Error(reply?.error||'Whisper 服务没有响应');
-      return reply.result;
+      if (!this.config?.key) throw Error('音频后台尚未更新，请重新加载扩展并刷新课程页');
+      const controller = new AbortController();
+      this.controller = controller;
+      const timer = setTimeout(() => controller.abort(), type === 'health' ? 5000 : 45000);
+      try {
+        const response = await fetch('http://127.0.0.1:8766/' + type, {
+          method: type === 'health' ? 'GET' : 'POST',
+          headers: { Authorization: 'Bearer ' + this.config.key, 'Content-Type': 'application/json' },
+          ...(type === 'stream' ? { body: JSON.stringify({ samples: fields.samples, prompt: this.config.prompt || '' }) } : {}),
+          signal: controller.signal
+        });
+        const result = await response.json();
+        if (!response.ok) throw Error(result.error || '本机识别服务返回错误');
+        return result;
+      } catch (error) {
+        if (error.name === 'AbortError') throw Error('本机 Whisper 请求超时，请重新识别');
+        if (error instanceof TypeError) throw Error('无法连接本机 Whisper，请检查服务是否运行');
+        throw error;
+      } finally { clearTimeout(timer); if (this.controller === controller) this.controller = null; }
     }
     setClock(clock) {
       if(!Number.isFinite(clock.time)||!Number.isInteger(clock.epoch)||!Number.isFinite(clock.rate))return;
@@ -37,7 +53,14 @@
       this.silence=energy/Math.max(n,1)<0.000025?(this.silence||0)+n:0;
       this.final=this.count>=16000*Math.min(12,12/this.clock.rate)||this.silence>=11200;
       if(this.count>=32000&&(this.final||this.count-(this.sentCount||0)>=32000))void this.pump();
-      if(this.count>256000)this.fail('Whisper 跟不上播放，已停止识别；视频继续播放。');
+      if(this.count>256000){
+        // Keep a recent bounded window while the current inference finishes.
+        let drop=this.count-64000;const skipped=drop,tail=[];
+        for(const block of this.blocks){if(drop>=block.length)drop-=block.length;else{tail.push(block.slice(drop));drop=0;}}
+        this.blocks=tail;this.count=64000;this.startTime+=skipped/16000*this.clock.rate;
+        this.revision++;this.segment++;this.sentCount=0;this.silence=0;this.final=false;
+        this.emit({type:'backlog'});
+      }
     }
     async pump() {
       if(this.busy||this.closed||this.count<32000)return;
@@ -57,7 +80,7 @@
       finally {this.busy=false;if(!this.closed&&this.count>=32000&&(this.final||this.count-(this.sentCount||0)>=32000))void this.pump();}
     }
     fail(error){this.close();this.emit({type:'error',error});}
-    close(){if(this.closed)return;this.closed=true;this.revision++;if(this.node){this.node.port.onmessage=null;this.source.disconnect(this.node);this.node.disconnect();}this.silent?.disconnect();this.blocks=[];}
+    close(){if(this.closed)return;this.closed=true;this.revision++;this.controller?.abort();if(this.node){this.node.port.onmessage=null;this.source.disconnect(this.node);this.node.disconnect();}this.silent?.disconnect();this.blocks=[];}
   }
   root.ICourseWhisperStream={WhisperStream};
 })(globalThis);
