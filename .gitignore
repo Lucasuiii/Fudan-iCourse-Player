@@ -16,3 +16,8 @@ __pycache__/
 connection-key.txt
 recordings.json
 local-whisper/state/
+
+# Qwen pilot models and private transcription reports
+*.safetensors
+local-qwen/state/
+pilot-results.json

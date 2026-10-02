@@ -92,3 +92,7 @@ sh local-whisper/start-macos.sh
 修复 [#11](https://github.com/Lucasuiii/Fudan-iCourse-Player/issues/11)：WebVPN 模式通过统一的 hls.js 加载器逐次转换 HTTP(S) 资源地址，包括绝对子清单、分片、初始化分片和 AES 密钥。已转换的 WebVPN URL 保持原样；端口、查询参数、字节范围与取消行为保留。校园网模式仍使用默认加载器和原地址。
 
 回归使用实际 `startLive`、仓库内 hls.js 1.7.3 和虚构清单／XHR 传输，验证相对与绝对资源路由；不代表真实 WebVPN 登录会话或学校直播已完成播放验收。该转换适用于 hls.js 路径，浏览器原生 HLS 回退路径尚未覆盖。
+
+## Qwen 窗口缓存实验
+
+已独立试跑 Qwen3-ASR-1.7B 的 MLX 8-bit 权重及 20 秒窗口缓存。此机 30 分钟样本处理约 176.6 秒，前瞻调度模拟可跟上 2×；当前尚未接入播放器，逐句对齐和真实浏览器验证仍待完成。见 [实测与边界](docs/qwen-window-pilot.md)、[复现工具](local-qwen/README.md)。
