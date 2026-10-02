@@ -18,6 +18,7 @@
   function vpnUrl(rawUrl) {
     const url = new URL(rawUrl);
     if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('不支持的视频地址');
+    if (url.hostname === VPN_HOST) return url.href;
     const key = CryptoJS.enc.Utf8.parse(VPN_KEY);
     const encoded = CryptoJS.AES.encrypt(CryptoJS.enc.Utf8.parse(url.hostname), key, {
       iv: key, mode: CryptoJS.mode.CFB, padding: CryptoJS.pad.NoPadding
@@ -25,6 +26,22 @@
     const protocol = url.protocol.slice(0, -1);
     const port = url.port ? '-' + url.port : '';
     return 'https://' + VPN_HOST + '/' + protocol + port + '/77726476706e69737468656265737421' + encoded + url.pathname + url.search + url.hash;
+  }
+
+  function hlsConfig(Hls, ctx) {
+    const config = { enableWorker: false, lowLatencyMode: true, backBufferLength: 30 };
+    if (ctx.vpn) {
+      // The generic loader also handles AES keys and init/partial segments.
+      // Retain the built-in transport, retry, range and cancellation behavior.
+      config.loader = class extends Hls.DefaultConfig.loader {
+        load(context, loaderConfig, callbacks) {
+          const url = new URL(context.url);
+          if (url.protocol === 'http:' || url.protocol === 'https:') context.url = vpnUrl(context.url);
+          super.load(context, loaderConfig, callbacks);
+        }
+      };
+    }
+    return config;
   }
 
   function courseIdFromUrl(rawUrl) {
@@ -219,5 +236,5 @@
     return (await send(type, fields)).state;
   }
 
-  root.ICourseCore = { context, vpnUrl, courseIdFromUrl, api, parseCourse, hasLectureStarted, selectVideo, selectLive, probeLecture, signVideo, subtitleCues, subtitleVtt, voiceRequest };
+  root.ICourseCore = { context, vpnUrl, hlsConfig, courseIdFromUrl, api, parseCourse, hasLectureStarted, selectVideo, selectLive, probeLecture, signVideo, subtitleCues, subtitleVtt, voiceRequest };
 })(globalThis);

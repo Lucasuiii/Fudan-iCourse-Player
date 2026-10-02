@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "iCourse 随行播放器",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "在已登录的复旦 iCourse 页面中自动查找直播与录播，提供字幕和可选降噪。",
   "content_scripts": [
     {
