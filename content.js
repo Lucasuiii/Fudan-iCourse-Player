@@ -695,7 +695,7 @@
     status('正在连接直播流…');
     try {
       if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-        state.hls = new Hls({ enableWorker: false, lowLatencyMode: true, backBufferLength: 30 });
+        state.hls = new Hls(core.hlsConfig(Hls, ctx));
         state.hls.on(Hls.Events.ERROR, (_event, data) => {
           if (state.loadToken !== token || panel.hidden) return;
           if (data.fatal) status('直播流加载失败：' + (data.details || '请检查地址、权限和跨域设置'), true);
