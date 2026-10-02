@@ -95,4 +95,4 @@ sh local-whisper/start-macos.sh
 
 ## Qwen 窗口缓存实验
 
-已独立试跑 Qwen3-ASR-1.7B 的 MLX 8-bit 权重及 20 秒窗口缓存。此机 30 分钟样本处理约 176.6 秒，前瞻调度模拟可跟上 2×；当前尚未接入播放器，逐句对齐和真实浏览器验证仍待完成。见 [实测与边界](docs/qwen-window-pilot.md)、[复现工具](local-qwen/README.md)。
+已完成 Qwen3-ASR-1.7B 未量化原版与 MLX 8-bit 的同条件对比。按用户选择保留原版 BF16：30 分钟样本处理约 273.7 秒，每个 20 秒窗口最慢约 4.54 秒，100 秒前瞻调度模拟能跟上 2×。默认安装只下载原版；8-bit 权重及缓存清理后仅保留对比记录。当前尚未接入播放器，逐句对齐和真实浏览器验证仍待完成。见 [完整对比与 2× 可行性](docs/qwen-window-pilot.md)、[复现工具](local-qwen/README.md)。
