@@ -1,19 +1,13 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
 let prompts = {};
-function showPreset(){
-  const note=$('#preset-info'),preset=ICourseTerms.preset($('#course').value.trim());
-  note.hidden=!preset;
-  note.textContent=preset?'此课程自动附加希腊字母和数值算法术语提示。填写的关键词可补充并优先使用，发送的总长度最多 800 字。提示不保证识别正确，修改后使用对应的新字幕缓存。':'';
-}
 chrome.storage.local.get(['whisperKey', 'whisperCourseId', 'whisperPrompts']).then(values => {
   $('#key').value = values.whisperKey || '';
   $('#course').value = values.whisperCourseId || '';
   prompts = values.whisperPrompts || {};
   $('#prompt').value = prompts[$('#course').value] || '';
-  showPreset();
 });
-$('#course').addEventListener('input', () => { $('#prompt').value = prompts[$('#course').value] || ''; showPreset(); });
+$('#course').addEventListener('input', () => { $('#prompt').value = prompts[$('#course').value] || ''; });
 $('#save').addEventListener('click', async () => {
   const key = $('#key').value.trim(), course = $('#course').value.trim(), prompt = $('#prompt').value.trim().slice(0, 800);
   const label = $('#status');

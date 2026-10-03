@@ -2,10 +2,10 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
-function app(){
+function app(prompts={'11':'QR 分解'}){
  const listeners=[],calls=[];
  const event={addListener(){}};
- const chrome={runtime:{id:'own',getURL:p=>'chrome-extension://own/'+p,onMessage:{addListener:f=>listeners.push(f)}},tabs:{onRemoved:event,onUpdated:event},action:{onClicked:event},storage:{local:{get:async()=>({whisperKey:'private',whisperPrompts:{'11':'QR 分解'}})}}};
+ const chrome={runtime:{id:'own',getURL:p=>'chrome-extension://own/'+p,onMessage:{addListener:f=>listeners.push(f)}},tabs:{onRemoved:event,onUpdated:event},action:{onClicked:event},storage:{local:{get:async()=>({whisperKey:'private',whisperPrompts:prompts})}}};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../course-terms.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../background.js'),'utf8'),{chrome,AbortSignal,AbortController,setTimeout,clearTimeout,fetch:async(url,init)=>{calls.push({url,init});return {ok:true,json:async()=>({cues:[]})};}});
  const send=(message,sender={id:'own',tab:{id:1}})=>new Promise(resolve=>{let waiting=false;for(const f of listeners)waiting=f({target:'whisper-background',courseId:'11',...message},sender,resolve)===true||waiting;if(!waiting)resolve(null);});
  return {send,calls,chrome};
@@ -59,10 +59,17 @@ test('Qwen cache lookup uses trusted glossary and owner, and options pages canno
  assert.equal(await a.send(message,{id:'own',url:'chrome-extension://own/options.html'}),null);
 });
 
-test('Qwen inference, cache lookup, export and Whisper use identical numerical-analysis context',async()=>{
- const a=app();
+test('Qwen inference, cache lookup, export and Whisper use only the saved course context',async()=>{
+ const a=app({'38146':'ε epsilon，QR 分解'});
  for(const type of ['chunk','cached-chunk','export-captions'])assert.equal((await a.send({target:'qwen-background',type,courseId:'38146',requestId:type,chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100,prompt:'caller spoof'}})).ok,true);
  assert.equal((await a.send({type:'chunk',courseId:'38146',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100}})).ok,true);
  const prompts=a.calls.map(c=>JSON.parse(c.init.body).prompt);
- assert.equal(new Set(prompts).size,1);assert.match(prompts[0],/α 阿尔法/);assert.equal(prompts[0].includes('caller spoof'),false);
+ assert.equal(new Set(prompts).size,1);assert.equal(prompts[0],'ε epsilon，QR 分解');assert.equal(prompts[0].includes('caller spoof'),false);
+});
+test('numerical course inference has no implicit glossary when its settings are empty',async()=>{
+ const a=app();
+ await a.send({target:'qwen-background',type:'chunk',courseId:'38146',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100}});
+ await a.send({type:'chunk',courseId:'38146',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100}});
+ assert.equal(JSON.parse(a.calls[0].init.body).prompt,'');
+ assert.equal(Object.hasOwn(JSON.parse(a.calls[1].init.body),'prompt'),false);
 });
