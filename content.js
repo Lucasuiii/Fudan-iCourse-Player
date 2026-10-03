@@ -18,7 +18,7 @@
   panel.hidden = true;
   panel.innerHTML = `
     <div class="icp-shell" role="dialog" aria-modal="true" aria-label="Lyue" tabindex="-1">
-      <header class="icp-header"><div class="icp-brand"><span class="icp-mark">▶</span><div><small>LYUE · 1.1.2</small><h2>Lyue</h2></div></div><button class="icp-sidebar-toggle" type="button" aria-expanded="true" aria-controls="icp-sidebar">收起侧栏</button><button class="icp-close" type="button" title="关闭" aria-label="关闭播放器">×</button></header>
+      <header class="icp-header"><div class="icp-brand"><span class="icp-mark">▶</span><div><small>LYUE · 1.1.3</small><h2>Lyue</h2></div></div><button class="icp-sidebar-toggle" type="button" aria-expanded="true" aria-controls="icp-sidebar">收起侧栏</button><button class="icp-close" type="button" title="关闭" aria-label="关闭播放器">×</button></header>
       <details class="icp-course-switch"><summary>切换课程 / 直播</summary><div class="icp-topbar"><label>课程 ID <input class="icp-course-id" inputmode="numeric" placeholder="从课程网址获取" aria-label="课程 ID"></label><button class="icp-load" type="button">打开课程 <span aria-hidden="true">→</span></button><details class="icp-livebox"><summary>连接直播流</summary><div class="icp-livebar"><label>HLS 直播地址 <input class="icp-live-url" type="url" placeholder="粘贴有权限的 .m3u8 地址" aria-label="HLS 直播地址"></label><button class="icp-live-open" type="button">播放直播</button></div></details></div></details>
       <div class="icp-statusbar"><p class="icp-status" role="status">在 iCourse 登录后输入课程 ID，或从课程页面自动识别。</p><span class="icp-subtitle-status" role="status">字幕未加载</span><button class="icp-qwen-cancel" type="button" hidden>取消准备</button></div>
       <div class="icp-layout">
@@ -26,7 +26,7 @@
         <main class="icp-main"><div class="icp-stage"><media-theme-sutro class="icp-theme"><video class="icp-video" slot="media" controls playsinline preload="metadata"></video></media-theme-sutro><div class="icp-local-caption" hidden></div><div class="icp-placeholder"><span>▶</span><strong>选择一节课次，开始观看</strong><small>你的课程 · 更舒服的播放体验</small></div></div>
           <div class="icp-now"><div><small>当前课次</small><strong class="icp-now-title">等待选择课次</strong></div><span class="icp-date"></span></div>
           <div class="icp-tools"><button class="icp-go-live" type="button" hidden>● 回到直播</button><button class="icp-more-toggle" type="button" aria-expanded="false" aria-controls="icp-more">识别与增强</button><details class="icp-cache-progress" hidden><summary class="icp-cache-count">字幕缓存 0/0</summary><div class="icp-cache-detail"><div class="icp-cache-window"></div><progress class="icp-cache-meter" max="1" value="0" aria-label="整课字幕缓存进度"></progress><div class="icp-cache-map" role="img" aria-label="字幕缓存时间分布"></div><small class="icp-cache-phase" role="status"></small></div></details></div>
-          <section class="icp-more" id="icp-more" aria-label="更多播放设置" hidden><div class="icp-toolgroup"><label>来源 <select class="icp-caption-source" aria-label="字幕来源"><option value="platform">平台字幕</option><option value="qwen-cache">Qwen 原版 · 录播缓存</option><option value="whisper-live">Whisper 流式（备用）</option></select></label><button class="icp-cache-auto" type="button" aria-pressed="true" hidden>整课缓存：开</button><button class="icp-whisper-settings" type="button">关键词与连接</button><button class="icp-whisper-retry" type="button">重新识别</button><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button></div><div class="icp-caption-options"><label>字幕字号 <select class="icp-caption-size"><option value="small">小</option><option value="medium" selected>标准</option><option value="large">大</option></select></label><label>字幕背景 <select class="icp-caption-background"><option value="soft">浅</option><option value="medium" selected>标准</option><option value="solid">深</option></select></label><label>字幕位置 <select class="icp-caption-position"><option value="bottom" selected>下方</option><option value="top">上方</option></select></label></div></section>
+          <section class="icp-more" id="icp-more" aria-label="更多播放设置" hidden><div class="icp-toolgroup"><label>来源 <select class="icp-caption-source" aria-label="字幕来源"><option value="platform">平台字幕</option><option value="qwen-cache">Qwen 原版 · 录播缓存</option><option value="whisper-live">Whisper 流式（备用）</option></select></label><label class="icp-qwen-wait-setting" hidden>字幕等待上限 <select class="icp-qwen-wait" aria-label="字幕等待上限"><option value="0">不等待</option><option value="3">3 秒</option><option value="5" selected>5 秒</option><option value="10">10 秒</option><option value="15">15 秒</option></select></label><button class="icp-cache-auto" type="button" aria-pressed="true" hidden>整课缓存：开</button><button class="icp-whisper-settings" type="button">关键词与连接</button><button class="icp-whisper-retry" type="button">重新识别</button><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button></div><div class="icp-caption-options"><label>字幕字号 <select class="icp-caption-size"><option value="small">小</option><option value="medium" selected>标准</option><option value="large">大</option></select></label><label>字幕背景 <select class="icp-caption-background"><option value="soft">浅</option><option value="medium" selected>标准</option><option value="solid">深</option></select></label><label>字幕位置 <select class="icp-caption-position"><option value="bottom" selected>下方</option><option value="top">上方</option></select></label></div></section>
           <div class="icp-hint">空格播放/暂停 · ←/→ 快退/快进 · F 全屏 · P 画中画 · C 字幕 · 人声增强默认关闭</div>
         </main>
       </div>
@@ -45,6 +45,11 @@
     onProgress:renderCacheProgress,
     onStatus:(text,waiting)=>{if(state.captionSource==='qwen-cache'){$('.icp-subtitle-status').textContent=text;$('.icp-qwen-cancel').hidden=!waiting;if(!qwen.busy)$('.icp-cache-phase').textContent=text;}}
   });
+  const waitControl=$('.icp-qwen-wait');
+  const savedWait=storageGet('icp:settings:qwen-wait');
+  if(['0','3','5','10','15'].includes(savedWait))waitControl.value=savedWait;
+  const applyWaitLimit=()=>{qwen.setWaitLimit(Number(waitControl.value)*1000);storageSet('icp:settings:qwen-wait',waitControl.value);};
+  waitControl.addEventListener('change',applyWaitLimit);applyWaitLimit();
   $('.icp-qwen-cancel').addEventListener('click',()=>{void qwenMedia({action:'release'}).catch(()=>{});qwen.stop();$('.icp-caption-source').value='platform';void changeCaptionSource();});
   const input = $('.icp-course-id');
   const list = $('.icp-list');
@@ -260,6 +265,7 @@
     state.asrEpoch++;
     const local = isStreaming();
     $('.icp-cache-auto').hidden=state.captionSource!=='qwen-cache';
+    $('.icp-qwen-wait-setting').hidden=state.captionSource!=='qwen-cache';
     $('.icp-whisper-retry').textContent=state.captionSource==='qwen-cache'?'重新载入':'重新识别';
     state.cues = local || state.captionSource==='qwen-cache' ? state.localCues : state.platformCues;
     $('.icp-local-caption').hidden = true;
@@ -658,6 +664,7 @@
     state.captionsLoading = false;
     $('.icp-transcript-filter').value = '';
     $('.icp-cache-progress').hidden=true;
+    $('.icp-qwen-wait-setting').hidden=true;
     $('.icp-subtitle-status').textContent = '字幕未加载';
     updateCaptionButton();
     renderTranscript();
@@ -729,6 +736,9 @@
       video.playbackRate = preferredSpeed();
       $('.icp-placeholder').hidden = true;
       status('视频已就绪。');
+      // Each recording opens with Qwen; live playback keeps its separate subtitle path.
+      $('.icp-caption-source').value = 'qwen-cache';
+      void changeCaptionSource();
       void loadSubtitles(lecture, token, controller.signal);
       try { await video.play(); if (state.loadToken === token && !panel.hidden) status('正在播放。'); }
       catch (error) {
