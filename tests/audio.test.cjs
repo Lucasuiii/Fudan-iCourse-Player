@@ -36,7 +36,7 @@ function background() {
   vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../course-terms.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname, '../background.js'), 'utf8'), { chrome });
   async function click(tabId = 1) { chrome.action.onClicked.fn({ id: tabId }); await tick(); await tick(); }
   const message = (type, tabId = 1, sender = { id: 'test', tab: { id: tabId } }) => new Promise(resolve => {
-    if (!chrome.runtime.onMessage.fn({ target: 'voice-background', type }, sender, resolve)) resolve(null);
+    if (!chrome.runtime.onMessage.fn({ target: 'voice-background', type, tabId }, sender, resolve)) resolve(null);
   });
   return { chrome, click, message, ready, notices, calls, messages, state: () => current, open: () => open };
 }
@@ -168,4 +168,17 @@ test('capture forwards trusted course configuration only to the extension offscr
  const a=background();Object.assign(a.ready,{asr:true,courseId:'11'});await a.click();
  const start=a.messages.find(m=>m.type==='start');assert.equal(start.target,'voice-offscreen');assert.equal(start.config.key,'private-key');assert.equal(start.config.prompt,'QR 分解');
  assert.equal(JSON.stringify(a.notices).includes('private-key'),false);assert.equal(JSON.stringify(a.notices).includes('QR 分解'),false);await a.click();
+});
+test('only the owning extension offscreen page can report enhancement fallback', async () => {
+ const app=background();await app.click();
+ assert.equal(await app.message('enhancement-changed'),null);
+ const before=app.notices.length;
+ const sender={id:'test',url:'chrome-extension://test/offscreen.html'};
+ await app.message('enhancement-changed',1,sender);
+ // The handler obtains ownership from the offscreen state, never trusts message state.
+ assert.equal(app.notices.length,before+1);
+ assert.equal(app.notices.at(-1).state.tabId,1);
+ await app.message('enhancement-changed',2,sender);
+ assert.equal(app.notices.length,before+1);
+ await app.click();
 });

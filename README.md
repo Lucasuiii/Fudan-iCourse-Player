@@ -71,7 +71,7 @@ sh local-whisper/start-macos.sh
 
 人声增强默认关闭。先播放课程，再点击浏览器工具栏的 **Lyue 图标**启动捕获；若未显示图标，先在扩展菜单中固定它。播放器设置可切换增强／原声，再次点击工具栏图标会停止捕获。切课、关闭播放器或离开页面时自动停止。
 
-增强采用高通、50 Hz 陷波、人声频段均衡、低通与温和动态压缩，主要缓解嗡声、低频浑浊和高频嘶声。它不具备神经网络降噪或说话人分离能力，实际课堂听感需对照判断。增强只处理回放声音，识别仍使用原声；参数及测量见 [音频检查](docs/audio-1.1.4-check.md)。捕获整个标签页时，请避免其他播放器同时发声。
+增强先使用本地 RNNoise 神经网络抑制空调、风扇等持续背景噪声，再做温和均衡与动态压缩。模型随扩展打包，无需额外服务或下载；加载失败时保留基础增强，并在播放器显示状态。它不支持说话人分离，较弱的人声可能受到影响，可随时切回原声对照。增强只处理回放声音，Qwen 与 Whisper 的识别输入保持原声。测量与限制见 [降噪检查](docs/audio-1.2.0-check.md)。捕获整个标签页时，请避免其他播放器同时发声。
 
 直播课次优先使用平台返回的 HLS 地址，也可在「连接直播流」粘贴本人有权限的 `.m3u8` 地址。Qwen 缓存仅用于录播；直播可使用平台字幕或 Whisper。直播跨域限制、平台权限和网络状况仍可能影响播放。
 
@@ -88,6 +88,7 @@ sh local-whisper/start-macos.sh
 ```sh
 npm ci --ignore-scripts
 npm run build:player
+npm run build:audio
 npm test
 python3 -m unittest discover -s local-qwen -p 'test_*.py'
 python3 -m unittest discover -s local-whisper -p 'test_*.py'
@@ -99,6 +100,7 @@ git diff --check
 ## 第三方组件
 
 - [Sutro 0.2.1](https://player.style/themes/sutro)／[Media Chrome 4.19.3](https://github.com/muxinc/media-chrome)：MIT，见 `vendor/licenses/`。
+- [RNNoise](https://github.com/xiph/rnnoise)／[@jitsi/rnnoise-wasm 0.2.1](https://github.com/jitsi/rnnoise-wasm)：BSD-3-Clause／Apache-2.0，见 `vendor/licenses/`。
 - [CryptoJS 4.2.0](https://github.com/brix/crypto-js)：MIT，见 `vendor/CRYPTO-JS-LICENSE`。
 - [hls.js 1.7.3](https://github.com/video-dev/hls.js)：Apache-2.0，见 `vendor/HLS-LICENSE`。
 

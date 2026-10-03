@@ -61,17 +61,19 @@ chrome.action.onClicked.addListener((tab) => {
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message?.target !== 'voice-background' || sender.id !== chrome.runtime.id) return;
   const fromOffscreen = sender.url === chrome.runtime.getURL('offscreen.html') && !sender.tab;
-  if (!sender.tab && !(fromOffscreen && ['ended', 'asr-event'].includes(message.type))) return;
+  if (!sender.tab && !(fromOffscreen && ['ended', 'asr-event', 'enhancement-changed'].includes(message.type))) return;
+  if (message.type === 'enhancement-changed' && !fromOffscreen) return;
   if (message.type === 'asr-event' && fromOffscreen) {
     void chrome.tabs.sendMessage(message.tabId, { target: 'voice-content', event: message.event }).catch(() => {});
     return;
   }
   const tabId = sender.tab?.id ?? message.tabId;
-  if (!['state', 'toggle', 'stop', 'ended', 'asr', 'clock'].includes(message.type)) return;
+  if (!['state', 'toggle', 'stop', 'ended', 'asr', 'clock', 'enhancement-changed'].includes(message.type)) return;
   const job = serialized(async () => {
     if (message.type === 'stop' || message.type === 'ended') return stopTab(tabId);
     if (message.type === 'clock' || message.type === 'asr') return audio(message.type, { tabId, clock: message.clock, enabled: Boolean(message.enabled), engine: message.engine, courseId: message.courseId });
     let state = await audio('state');
+    if (message.type === 'enhancement-changed' && state.tabId === tabId) await notify(tabId, state);
     if (message.type === 'toggle') {
       if (state.tabId !== tabId) throw new Error('首次启用：请点击浏览器工具栏的Lyue图标');
       try { state = await audio('toggle', { tabId }); }
