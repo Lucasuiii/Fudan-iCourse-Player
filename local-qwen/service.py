@@ -114,10 +114,6 @@ class Engine(legacy.Engine):
         self.gate=SpeechGate(vad)
         self.model_id=':'.join(digest_file(p) for p in [Path(model)/'model.safetensors',Path(model)/'config.json',Path(model)/'tokenizer_config.json',Path(aligner)/'model.safetensors',Path(vad)])+':bf16:Chinese:512:aligned-vad-v1'
 
-    def local_media(self, source):
-        temporary=self.media.get(legacy.recording_key(source)) if hasattr(self,'media') else None
-        return temporary or super().local_media(source)
-
     def infer(self, pcm, prompt):
         import numpy as np
         audio=np.frombuffer(pcm,dtype='<i2').astype(np.float32)/32768
@@ -127,7 +123,7 @@ class Engine(legacy.Engine):
 
     def stream(self, *_):raise RuntimeError('Qwen 缓存模式只支持录播，请选择 Qwen 录播缓存')
 
-    def chunk(self, source, start, duration, prompt=''):
+    def chunk(self, source, start, duration, prompt='', relay_id=None, owner=None):
         legacy.validate_source(source)
         if isinstance(start,bool) or not isinstance(start,int) or start < 0 or start%20 or start > 86400:
             raise ValueError('分段位置无效')
@@ -149,11 +145,12 @@ class Engine(legacy.Engine):
                     return result
                 offset=max(0,start-2);end=min(duration,start+20);length=min(duration,end+2)-offset
                 local=clip[0] if clip else self.local_media(source)
+                relay=self.media.url(relay_id,owner,legacy.recording_key(source)) if relay_id else None
                 if clip:
                     offset=max(offset,clip[1]);length=min(duration,end+2,clip[1]+clip[2] if clip[2] else duration)-offset
                 with tempfile.TemporaryDirectory(prefix='icourse-qwen-') as tmp:
                     wav=Path(tmp)/'audio.wav'
-                    cmd=[self.ffmpeg,'-nostdin','-v','error',*([] if local else remote_input_options(source)),'-rw_timeout','15000000','-protocol_whitelist','file' if local else 'https,http,tcp,tls,crypto','-ss',str(offset-(clip[1] if clip else 0)),'-i',str(local) if local else source,'-t',str(length),'-vn','-ac','1','-ar','16000','-c:a','pcm_s16le',str(wav)]
+                    cmd=[self.ffmpeg,'-nostdin','-v','error',*([] if local or relay else remote_input_options(source)),'-rw_timeout','15000000','-protocol_whitelist','file' if local else 'http,tcp' if relay else 'https,http,tcp,tls,crypto','-ss',str(offset-(clip[1] if clip else 0)),'-i',str(local) if local else relay or source,'-t',str(length),'-vn','-ac','1','-ar','16000','-c:a','pcm_s16le',str(wav)]
                     try:subprocess.run(cmd,check=True,capture_output=True,timeout=65)
                     except subprocess.CalledProcessError as error:
                         message=audio_read_error(error.stderr or b'');print(message,flush=True)
@@ -192,16 +189,23 @@ def main():
     parent=legacy.handler(engine,key.read_text().strip(),args.port)
     class Handler(parent):
         def do_POST(self):
-            if self.path!='/media':return super().do_POST()
+            if self.path not in ('/media','/relay-chunk'):return super().do_POST()
             if not self.authorized():return self.send(403,{'error':'本地连接密钥无效'})
             try:
                 size=int(self.headers.get('Content-Length','0'))
-                if not 0<size<=800000:raise ValueError('下载请求过大')
+                if not 0<size<=400000:raise ValueError('分段读取请求过大')
                 data=json.loads(self.rfile.read(size))
-                if not isinstance(data,dict) or not isinstance(data.get('owner'),str):raise ValueError('下载请求无效')
-                media_key=legacy.recording_key(data['source']) if data.get('action')=='begin' else None
-                self.send(200,engine.media.transfer(data,media_key))
-            except (ValueError,KeyError,TypeError):self.send(400,{'error':'临时下载无效、超过限制或已取消'})
+                if not isinstance(data,dict) or not isinstance(data.get('owner'),str):raise ValueError('分段读取请求无效')
+                if self.path=='/relay-chunk':
+                    if not isinstance(data.get('relayId'),str):raise ValueError('分段读取会话缺失')
+                    result=engine.chunk(data.get('source'),data.get('start'),data.get('duration'),data.get('prompt',''),data.get('relayId'),data['owner'])
+                else:
+                    media_key=legacy.recording_key(data['source']) if data.get('action')=='begin' else None
+                    result=engine.media.transfer(data,media_key)
+                self.send(200,result)
+            except (ValueError,KeyError,TypeError):self.send(400,{'error':'分段读取参数无效或已取消'})
+            except RuntimeError as error:self.send(503,{'error':str(error)})
+            except Exception:self.send(500,{'error':'本地窗口识别失败'})
     server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
     def expire():
         while True:time.sleep(60);engine.media.cleanup()
@@ -210,6 +214,6 @@ def main():
     def terminate(*_):raise SystemExit(0)
     signal.signal(signal.SIGTERM,terminate)
     try:server.serve_forever()
-    finally:server.server_close();engine.media.directory.cleanup()
+    finally:server.server_close();engine.media.close()
 
 if __name__=='__main__':main()

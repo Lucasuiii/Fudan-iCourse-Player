@@ -46,3 +46,8 @@ test('Qwen uses its fixed authenticated endpoint and scoped course terms',async(
  assert.equal(await a.send({target:'qwen-background',type:'chunk'},{id:'foreign',tab:{id:1}}),null);
  assert.equal(await a.send({target:'qwen-background',type:'chunk'},{id:'own',url:'chrome-extension://own/options.html'}),null);
 });
+
+test('relay inference uses the trusted tab owner and scoped course prompt',async()=>{
+ const a=app();const r=await a.send({target:'qwen-background',type:'relay-chunk',requestId:'relay',relayId:'range-token',owner:'spoof',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:20,duration:100,prompt:'untrusted'}});
+ assert.equal(r.ok,true);assert.equal(a.calls[0].url,'http://127.0.0.1:8768/relay-chunk');const body=JSON.parse(a.calls[0].init.body);assert.equal(body.owner,'1');assert.equal(body.relayId,'range-token');assert.equal(body.prompt,'QR 分解');
+});

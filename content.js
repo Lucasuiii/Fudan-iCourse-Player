@@ -1,4 +1,4 @@
-/* global ICourseCore, Hls, QwenCache */
+/* global ICourseCore, Hls, QwenCache, QwenRange */
 (function () {
   'use strict';
   const core = ICourseCore;
@@ -584,52 +584,29 @@
   }
   async function qwenMedia(media){
     const reply=await chrome.runtime.sendMessage({target:'qwen-background',type:'media',requestId:crypto.randomUUID(),media});
-    if(!reply?.ok)throw Error(reply?.error||'临时下载服务未响应');return reply.result;
+    if(!reply?.ok)throw Error(reply?.error||'分段读取服务未响应');return reply.result;
   }
-  async function downloadQwenMedia(source,signal){
-    let id,reader,finished=false;
-    try{
-      const user=await core.api(ctx,'/userapi/v1/infosimple',{}, {signal});
-      const fresh=core.signVideo(source,user.params||user.data||{});
-      const response=await fetch(fresh,{credentials:'include',headers:{Range:'bytes=0-'},signal});
-      if(!response.ok){await response.body?.cancel();throw Error('浏览器下载失败：HTTP '+response.status+'，请重新选择课次');}
-      const total=Number(response.headers.get('content-length'));
-      if(total>8*1024**3){await response.body?.cancel();throw Error('临时视频超过 8 GiB 上限');}
-      try{({id}=await qwenMedia({action:'begin',source,total}));}
-      catch(error){await response.body?.cancel();throw error;}
-      if(signal.aborted)throw new DOMException('已取消','AbortError');
-      reader=response.body.getReader();let offset=0;
-      while(true){
-        const {done,value}=await reader.read();if(done)break;
-        for(let at=0;at<value.length;at+=262144){
-          if(signal.aborted)throw new DOMException('已取消','AbortError');
-          const part=value.subarray(at,at+262144);let binary='';
-          for(let i=0;i<part.length;i+=8192)binary+=String.fromCharCode(...part.subarray(i,i+8192));
-          await qwenMedia({action:'append',id,offset,data:btoa(binary)});offset+=part.length;
-          $('.icp-subtitle-status').textContent='Qwen · 临时下载 '+(offset/1024**2).toFixed(1)+' MB'+(total?' / '+(total/1024**2).toFixed(1)+' MB':'')+' · 完成后开始识别';
-        }
-      }
-      if(signal.aborted)throw new DOMException('已取消','AbortError');
-      await qwenMedia({action:'finish',id});finished=true;
-    }finally{
-      if(!finished){if(reader)await reader.cancel().catch(()=>{});if(id)await qwenMedia({action:'abort',id}).catch(()=>{});}
-    }
-  }
+  const qwenRelaySources=new Set();
   async function qwenRequest(chunk,signal){
-    const requestId=crypto.randomUUID();
+    const requestId=crypto.randomUUID();let relay;
     const cancel=()=>{void chrome.runtime.sendMessage({target:'qwen-background',type:'cancel',requestId}).catch(()=>{});};
     signal.addEventListener('abort',cancel,{once:true});
-    const request=()=>chrome.runtime.sendMessage({target:'qwen-background',type:'chunk',chunk,requestId,courseId:state.currentCourseId||state.courseId});
+    const request=(type,relayId)=>chrome.runtime.sendMessage({target:'qwen-background',type,chunk,relayId,requestId,courseId:state.currentCourseId||state.courseId});
     try{
       if(signal.aborted)throw new DOMException('已取消','AbortError');
-      let reply=await request();
-      if(!reply?.ok&&/读取录播失败/.test(reply?.error||'')&&!signal.aborted){
-        $('.icp-subtitle-status').textContent='Qwen · 正在通过已登录浏览器临时下载…';
-        await downloadQwenMedia(chunk.source,signal);reply=await request();
+      let reply=qwenRelaySources.has(chunk.source)?null:await request('chunk');
+      if((!reply||(!reply.ok&&/读取录播失败/.test(reply.error||'')))&&!signal.aborted){
+        $('.icp-subtitle-status').textContent='Qwen · 正在准备当前窗口的分段读取…';
+        const user=await core.api(ctx,'/userapi/v1/infosimple',{}, {signal});
+        const fresh=core.signVideo(chunk.source,user.params||user.data||{});
+        relay=await QwenRange.open({url:fresh,source:chunk.source,send:qwenMedia,signal,onStatus:text=>{if(!signal.aborted)$('.icp-subtitle-status').textContent=text;}});
+        qwenRelaySources.add(chunk.source);while(qwenRelaySources.size>10)qwenRelaySources.delete(qwenRelaySources.values().next().value);
+        reply=await request('relay-chunk',relay.id);
+        if(relay.error)throw relay.error;
       }
       if(signal.aborted)throw new DOMException('已取消','AbortError');
       if(!reply?.ok)throw Error(reply?.error||'Qwen 后台未响应');return reply.result;
-    }finally{signal.removeEventListener('abort',cancel);}
+    }finally{if(relay)await relay.close();signal.removeEventListener('abort',cancel);}
   }
   function restartQwen(){
     state.cues=[];state.localCues=[];$('.icp-local-caption').hidden=true;$('.icp-local-caption').textContent='';renderTranscript();qwen.reset(true);if(!qwen.active)qwen.start();
@@ -658,7 +635,7 @@
   }
 
   function resetVideo() {
-    void qwenMedia({action:'release'}).catch(()=>{});
+    qwenRelaySources.clear();void qwenMedia({action:'release'}).catch(()=>{});
     saveProgress();
     state.loadToken += 1;
     state.playController?.abort();
