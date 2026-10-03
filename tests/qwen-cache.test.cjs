@@ -100,3 +100,12 @@ test('changing the limit during preparation counts time already spent waiting',t
  const c=new Cache({snapshot:()=>pos,request:()=>new Promise(()=>{}),onCues:()=>{},onStatus:()=>{},pause:()=>{pos.paused=true;},resume:()=>{resumes++;pos.paused=false;}});
  try{c.start();t.mock.timers.tick(2000);c.setWaitLimit(3000);t.mock.timers.tick(999);assert.equal(resumes,0);t.mock.timers.tick(1);assert.equal(resumes,1);t.mock.timers.tick(10000);assert.equal(resumes,1);}finally{c.stop();}
 });
+test('caption layout chooses natural boundaries and preserves identifiers and punctuation',()=>{
+ const cases=require('./fixtures/caption-layout.json');
+ for(const sample of cases){
+  const middle=Math.floor(sample.words.length/2);
+  const cues=Cache.layout([{start:0,alignedWords:sample.words.slice(0,middle)},{start:20,alignedWords:sample.words.slice(middle)}]);
+  assert.deepEqual(cues.map(c=>c.text),sample.expected,sample.name);
+  assert.ok(cues.every(c=>c.end>c.start),sample.name);
+ }
+});

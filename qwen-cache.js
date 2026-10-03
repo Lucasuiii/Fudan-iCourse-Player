@@ -2,27 +2,49 @@
 (function(root){
   function layout(windows){
     const ordered=[...windows].sort((a,b)=>a.start-b.start),cues=[];
-    const join=(a,b)=>a+(/[A-Za-z0-9]$/.test(a)&&/^[A-Za-z0-9]/.test(b)?' ':'')+b;
-    const terminal=text=>/[。！？!?；;]$/.test(text);
-    // Word ownership is already resolved by the service, so adjacent windows can be reflowed together.
-    const words=ordered.flatMap(result=>Array.isArray(result.alignedWords)?result.alignedWords:(result.cues||[]));
-    for(let i=0;i<words.length;i++){
-      const w=words[i];
-      if(!w.text||!Number.isFinite(w.start)||!Number.isFinite(w.end)||w.end<=w.start)continue;
-      const prev=cues.at(-1),gap=prev?w.start-prev.end:0;
-      const upcoming=words.slice(i,i+6).map(w=>w.text).join('');
-      const split=prev&&(terminal(prev.text)||gap>0.6||
-        (prev.text.length>=12&&(/[，,：:]$/.test(prev.text)||gap>0.35||/^(但是|所以|然后|不过|因此|接下来|另外|也就是说)/.test(upcoming)))||
-        prev.text.length+w.text.length>36||w.end-prev.start>8);
-      if(!prev||split)cues.push({...w});
-      else{prev.text=join(prev.text,w.text);prev.end=Math.max(prev.end,w.end);}
+    const textOf=words=>{
+      let text='',previous='';
+      for(const w of words){const current=w.text;const space=/[A-Za-z0-9]$/.test(previous)&&/^[A-Za-z0-9]/.test(current)&&(previous.length>1||current.length>1)?' ':'';text+=space+current;previous=current;}
+      return text;
+    };
+    const terminal=text=>/[。！？!?；;][”’」』）)"]*$/.test(text);
+    const punctuation=text=>/^[，。！？、：；,.!?;:）)”’」』"]/.test(text);
+    const words=ordered.flatMap(result=>Array.isArray(result.alignedWords)?result.alignedWords:(result.cues||[]))
+      .filter(w=>w.text&&Number.isFinite(w.start)&&Number.isFinite(w.end)&&w.end>w.start).sort((a,b)=>a.start-b.start);
+    let pending=[];
+    const emit=count=>{const part=pending.slice(0,count);cues.push({start:part[0].start,end:Math.max(...part.map(w=>w.end)),text:textOf(part)});pending=pending.slice(count);};
+    const naturalCut=()=>{
+      let best;
+      for(let i=1;i<pending.length;i++){
+        const before=textOf(pending.slice(0,i)),after=textOf(pending.slice(i));
+        if(before.length<8||after.length<6||punctuation(after))continue;
+        const gap=pending[i].start-pending[i-1].end;
+        let score=/[，,：:]$/.test(before)?60:gap>=0.18?35:0;
+        if(!score&&/^(但是|所以|然后|不过|因此|接下来|另外|也就是说)/.test(after))score=25;
+        if(score){score-=Math.abs(before.length-24)*0.4;if(!best||score>best.score)best={score,index:i};}
+      }
+      return best?best.index:pending.length;
+    };
+    // Reflow owned words across adjacent windows without changing recognition/cache identity.
+    for(const w of words){
+      if(pending.length&&!punctuation(w.text)){
+        const text=textOf(pending),gap=w.start-Math.max(...pending.map(x=>x.end));
+        if(terminal(text)||gap>0.6||(text.length>=12&&(/[，,：:]$/.test(text)||gap>0.35)))emit(pending.length);
+        else if(textOf([...pending,w]).length>36||w.end-pending[0].start>8){
+          emit(naturalCut());
+          if(pending.length&&(textOf([...pending,w]).length>36||w.end-pending[0].start>8))emit(pending.length);
+        }
+      }
+      pending.push(w);
     }
+    if(pending.length)emit(pending.length);
     const last=cues.at(-1),prev=cues.at(-2);
     if(prev&&last.text.length<6&&prev.text.length+last.text.length<=40&&last.end-prev.start<=9&&last.start-prev.end<=0.35&&!terminal(prev.text)){
-      prev.text=join(prev.text,last.text);prev.end=last.end;cues.pop();
+      prev.text=textOf([prev,last]);prev.end=Math.max(prev.end,last.end);cues.pop();
     }
     return cues;
   }
+
   class QwenCache {
     constructor({snapshot,request,onCues,onStatus,onProgress=()=>{},pause,resume,waitLimitMs=5000}) {
       Object.assign(this,{snapshot,request,onCues,onStatus,onProgress,pause,resume});
