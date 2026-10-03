@@ -1,6 +1,6 @@
 # Qwen 录播缓存字幕
 
-0.10.0 已接入播放器的“设置 → 来源 → Qwen 原版 · 录播缓存”。录播按原始音频提前识别，不需要工具栏音频捕获；直播可用 Whisper 流式备用。默认使用 [Qwen3-ASR-1.7B 未量化 BF16 权重](https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-bf16)，运行时为 [mlx-qwen3-asr](https://github.com/moona3k/mlx-qwen3-asr)。
+Lyue 1.0.0 已接入播放器的“设置 → 来源 → Qwen 原版 · 录播缓存”。录播按原始音频提前识别，不需要工具栏音频捕获；直播可用 Whisper 流式备用。默认使用 [Qwen3-ASR-1.7B 未量化 BF16 权重](https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-bf16)，运行时为 [mlx-qwen3-asr](https://github.com/moona3k/mlx-qwen3-asr)。
 
 ## 安装与复现
 

@@ -38,7 +38,7 @@ chrome.action.onClicked.addListener((tab) => {
     if (state.tabId === tab.id) { await stopTab(tab.id); return; }
     try {
       const ready = await chrome.tabs.sendMessage(tab.id, { target: 'voice-content', type: 'ready' });
-      if (!ready?.ready) throw new Error('请先在随行播放器中打开并播放一节课程');
+      if (!ready?.ready) throw new Error('请先在Lyue中打开并播放一节课程');
       if (state.tabId !== null) throw new Error('另一个标签页正在使用增强，请先在那里停止音频');
       if (!await hasOffscreen()) await chrome.offscreen.createDocument({
         url: 'offscreen.html', reasons: ['USER_MEDIA'], justification: '本地处理用户启动的课程标签页音频并回放，不录制或上传'
@@ -72,7 +72,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (message.type === 'clock' || message.type === 'asr') return audio(message.type, { tabId, clock: message.clock, enabled: Boolean(message.enabled), engine: message.engine, courseId: message.courseId });
     let state = await audio('state');
     if (message.type === 'toggle') {
-      if (state.tabId !== tabId) throw new Error('首次启用：请点击浏览器工具栏的随行播放器图标');
+      if (state.tabId !== tabId) throw new Error('首次启用：请点击浏览器工具栏的Lyue图标');
       try { state = await audio('toggle', { tabId }); }
       catch (error) { await stopTab(tabId); throw error; }
       await notify(tabId, state);

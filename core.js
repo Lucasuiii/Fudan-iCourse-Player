@@ -218,7 +218,7 @@
   }
 
   async function voiceRequest(runtime, type, fields = {}) {
-    const reload = '请在扩展管理页重新加载随行播放器，再刷新课程页面';
+    const reload = '请在扩展管理页重新加载Lyue，再刷新课程页面';
     if (!runtime?.id) throw new Error(reload);
     const send = async (operation, data = {}) => {
       let reply;
