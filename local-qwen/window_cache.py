@@ -11,7 +11,7 @@ import tempfile
 import time
 import wave
 
-VERSION = 2
+VERSION = 3
 
 
 def is_digital_silence(pcm):
@@ -84,7 +84,7 @@ class WindowCache:
         if decoded.get('truncated'):
             raise RuntimeError('Model output was truncated; incomplete text is not cached')
         result = {'start': start, 'end': end, 'audio_start': audio_start, 'audio_end': audio_end,
-                  'text': decoded['text'], 'timing': 'window-only', 'cached': False,
+                  'text': decoded['text'], 'words': decoded.get('segments', []), 'timing': 'word-aligned' if 'segments' in decoded else 'window-only', 'cached': False,
                   'seconds': time.perf_counter() - began}
         fd, temporary = tempfile.mkstemp(dir=self.cache, suffix='.tmp')
         try:

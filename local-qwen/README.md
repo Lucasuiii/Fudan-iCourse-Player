@@ -1,6 +1,6 @@
-# Qwen 窗口缓存实验
+# Qwen 录播缓存字幕
 
-这是独立的录播音频实验工具，尚未接入扩展的字幕来源选择器。当前播放器及 Whisper 服务继续使用原来的实现。默认使用 [Qwen3-ASR-1.7B 未量化 BF16 权重](https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-bf16)，运行时为 [mlx-qwen3-asr](https://github.com/moona3k/mlx-qwen3-asr)。
+0.10.0 已接入播放器的“设置 → 来源 → Qwen 原版 · 录播缓存”。录播按原始音频提前识别，不需要工具栏音频捕获；直播可用 Whisper 流式备用。默认使用 [Qwen3-ASR-1.7B 未量化 BF16 权重](https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-bf16)，运行时为 [mlx-qwen3-asr](https://github.com/moona3k/mlx-qwen3-asr)。
 
 ## 安装与复现
 
@@ -15,7 +15,7 @@ python3 -m venv "$QWEN_HOME/venv"
 HF_HUB_DISABLE_XET=1 "$QWEN_HOME/venv/bin/python" local-qwen/download_model.py
 ```
 
-下载脚本固定模型版本 `e1f6c266914abc5a46e8756e02580f834a6cf8a7`，权重文件约 4.08 GB，模型留在上述本机目录，不下载 ForcedAligner，也不放进扩展包。
+下载脚本固定模型版本 `e1f6c266914abc5a46e8756e02580f834a6cf8a7`，权重文件约 4.08 GB，模型留在上述本机目录，另下载约 1.84 GB 的 Qwen3-ForcedAligner-0.6B 与 Silero VAD；所有模型均不放进扩展包。
 
 提供本人有权使用的单声道 16 kHz PCM16 WAV。例如裁切片段对应原视频 10:00–40:00，则 `--offset 600`；`--position` 使用原视频时间：
 
@@ -29,16 +29,16 @@ HF_HUB_DISABLE_XET=1 "$QWEN_HOME/venv/bin/python" local-qwen/download_model.py
 
 `--terms` 可以省略或留空。切换关键词后会使用不同的缓存；旧文本不会冒充重新识别的结果。`--windows 90 --position 600` 可测完整 30 分钟。相同配置再次执行会直接复用缓存，不再加载模型。测冷缓存时给 `--state` 指定另一个本机目录。
 
-终端只打印耗时、字符数等指标。含课堂文本的报告写到本机 `pilot-results.json`，权限为 0600；缓存每个文件也以 0600 写入，最多保留 1800 个窗口。本工具没有网络服务或公开课堂数据的操作。
+终端只打印耗时、字符数等指标。含课堂文本的报告写到本机 `pilot-results.json`，权限为 0600；缓存每个文件也以 0600 写入，最多保留 1800 个窗口。独立 pilot 工具不启动服务；播放器服务只监听认证后的本机 8768 端口。
 
 ## 调度与时间边界
 
 - `WindowCache.plan(position)` 返回当前位置优先、最多前瞻 100 秒的视频窗口；定位不能越过导入片段的范围。
 - 每窗口覆盖 20 秒，附带前后各 2 秒上下文；边缘处裁到已导入片段内。只推理一个窗口，不并发运行模型。
-- 纯数字静音（PCM 振幅不超过 1 LSB）跳过模型并缓存空文本；这不是教室环境的语音 VAD，噪声和停顿仍可能产生幻觉。
+- pilot 只跳过数字静音；播放器服务另外用 Silero VAD 检查是否有语音，以减少停顿误生成。VAD 不能保证消除所有幻觉。
 - 缓存身份包含音频内容摘要、模型权重/配置及解码配置、课程关键词、窗口边界。截断的模型输出不会缓存。
 - 基准测试连续计算指定的全部窗口以测吞吐；报告另用实测耗时模拟受 100 秒前瞻限制的顺序调度。模拟从首窗口准备好后开始播放，并按 1×、1.5×、2× 计算未及时准备的窗口数。模拟不等于真实浏览器播放验收。
-- 模型文本包含重叠上下文，时间仅表示音频窗口，**不能当作逐句或逐字时间戳**。后续接入播放器前须完成边界去重、时间对齐、切课/跳转时丢弃旧回复以及真实浏览器验证。
+- pilot 文本只有窗口时间；播放器服务用 ForcedAligner 生成字词时间戳，按词中点归属窗口，合并为短字幕。跳转/切课会丢弃旧回复；0.75×–2× 倍速切换保留缓存。
 
 测试不下载模型，不依赖 MLX，可在 CI 中执行：
 
@@ -62,3 +62,22 @@ python3 local-qwen/compare.py \
 ```
 
 对比工具会检查窗口边界和计算精度，并只在终端输出汇总；包含文本分歧的报告以 0600 留在指定目录。它统计两份输出的分歧，不提供准确率。`negative_controls.py --model /absolute/path/model --output /absolute/path/controls.json` 生成三个无语音控制输入，绕过缓存保护直接检查模型误生成；该结果不代表真实教室噪声性能。
+
+## 播放器服务
+
+安装后在仓库根目录执行 `sh local-qwen/start-macos.sh`，保持终端运行。端口为 `127.0.0.1:8768`。第一次启动会沿用已有 Whisper 连接密钥；没有旧密钥时生成 `~/Library/Application Support/iCourseQwen/connection-key.txt`，在扩展“关键词与连接”中保存它，选择 Qwen 检查连接。
+
+模型串行处理 20 秒窗口，前后各 2 秒上下文，前瞻约 100 秒。当前窗口未就绪时临时暂停，准备好后恢复原来的播放状态；可点“取消准备”切回平台字幕。更换课程关键词会清空页面缓存并使用新的服务缓存身份；“重新载入”重新取当前与前方窗口，已有有效缓存仍会复用。服务读取有权限的课程 MP4，可复用 `local-whisper/import-recording.py` 导入的本地素材。跨域签名过期或录播访问受限会显示错误，不保证所有远程地址都可由 ffmpeg 读取。
+
+[Silero VAD](https://github.com/snakers4/silero-vad) 使用 MIT 许可；[Qwen ForcedAligner](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B) 使用 Apache-2.0 许可。下载固定版本并检查 VAD SHA256。
+
+## 可选豆包评分
+
+`doubao_reference.py` 仅为手动基准工具，播放器不会调用云端。需要先取得音频上传授权和语音服务 API Key，保存到本机私有文件。每次最多上传 30 分钟、20 MB 编码音频，一份任务只提交一次，超时后再次运行只查询已有任务；拒绝或提交状态不明时停止，不自动重复付费。输出以 0600 保存。
+
+```sh
+"$QWEN_HOME/venv/bin/python" local-qwen/doubao_reference.py --audio /absolute/path/authorized.wav --key-file /absolute/path/private-api-key.txt --output /absolute/path/doubao-reference.json
+python3 local-qwen/score_reference.py --reference /absolute/path/doubao-reference.json --quantized /absolute/path/8bit/pilot-results.json --original /absolute/path/bf16/pilot-results.json --output /absolute/path/scores.json
+```
+
+评分只表示与机器参考的字符一致程度，不是人工准确率。按每个模型输入窗口的精确音频范围选择参考词，双方都包含重叠上下文；统计分母也包含这些重复字符。若参考没有词时间戳则拒绝评分。

@@ -123,3 +123,31 @@ chrome.storage?.onChanged?.addListener((changes, area) => {
     target: 'voice-content', type: 'keywords-updated', courseIds, all: Boolean(changes.whisperKey)
   }).catch(() => {})))).catch(() => {});
 });
+
+// Qwen has its own loopback endpoint; credentials never go to course pages.
+const qwenRequests = new Map();
+chrome.runtime.onMessage.addListener((message,sender,respond)=>{
+  if(message?.target!=='qwen-background'||sender.id!==chrome.runtime.id)return;
+  const options=sender.url===chrome.runtime.getURL('options.html')&&!sender.tab;
+  if(!sender.tab&&!options)return;
+  if(!['chunk','health','cancel'].includes(message.type)||(options&&message.type!=='health'))return;
+  const owner=String(sender.tab?.id ?? 'options'),id=owner+':'+message.requestId;
+  if(message.type==='cancel'){qwenRequests.get(id)?.abort();respond({ok:true});return;}
+  const controller=new AbortController();qwenRequests.set(id,controller);
+  const timeout=setTimeout(()=>controller.abort(),150000);
+  (async()=>{
+    const {whisperKey,whisperPrompts}=await chrome.storage.local.get(['whisperKey','whisperPrompts']);
+    if(!whisperKey)throw Error('请在关键词与连接中保存本地服务密钥');
+    const prompt=/^\d{1,10}$/.test(message.courseId||'')?whisperPrompts?.[message.courseId]||'':'';
+    const response=await fetch('http://127.0.0.1:8768/'+(message.type==='chunk'?'chunk':'health'),{
+      method:message.type==='chunk'?'POST':'GET',signal:controller.signal,
+      headers:{Authorization:'Bearer '+whisperKey,'Content-Type':'application/json'},
+      ...(message.type==='chunk'?{body:JSON.stringify({source:message.chunk?.source,start:message.chunk?.start,duration:message.chunk?.duration,prompt})}:{})
+    });
+    const result=await response.json();if(!response.ok)throw Error(result.error||'Qwen 服务不可用');return result;
+  })().then(result=>respond({ok:true,result}),error=>respond({ok:false,error:controller.signal.aborted?'Qwen 请求已取消或超时':error.message}))
+    .finally(()=>{clearTimeout(timeout);if(qwenRequests.get(id)===controller)qwenRequests.delete(id);});
+  return true;
+});
+chrome.tabs.onRemoved.addListener(tabId=>{for(const [id,c] of qwenRequests)if(id.startsWith(tabId+':'))c.abort();});
+chrome.tabs.onUpdated.addListener((tabId,change)=>{if(change.status==='loading')for(const [id,c] of qwenRequests)if(id.startsWith(tabId+':'))c.abort();});

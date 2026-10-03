@@ -87,7 +87,7 @@ def main():
              'real_time_factor':sum(seconds)/sum(r['end']-r['start'] for r in results),
              'simulation':[simulate(seconds,20,rate) for rate in [1,1.5,2]],
              'boundary':'Window text includes overlap. No word alignment, accuracy ground truth or browser end-to-end test.'}
-    report={'summary':summary,'results':results}
+    report={'summary':summary,'results':results,'provenance':{'audio_sha256':cache.audio_id,'model_id':model_id,'offset':args.offset,'terms':args.terms}}
     destination=args.state/'pilot-results.json'
     destination.write_text(json.dumps(report,ensure_ascii=False,indent=2));destination.chmod(0o600)
     print(json.dumps({'event':'summary',**summary}),flush=True)

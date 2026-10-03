@@ -2,3 +2,5 @@
 mlx==0.32.3
 mlx-qwen3-asr==0.4.4
 huggingface-hub==2.1.1
+onnxruntime==1.24.2
+requests==2.32.5
