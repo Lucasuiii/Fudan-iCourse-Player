@@ -3,7 +3,7 @@
 let session = null;
 let queue = Promise.resolve();
 function snapshot() {
-  return session ? { tabId: session.tabId, enabled: session.enabled } : { tabId: null, enabled: false };
+  return session ? { tabId: session.tabId, enabled: session.enabled, ...(session.graph.mode ? { mode: session.graph.mode } : {}) } : { tabId: null, enabled: false };
 }
 async function stop() {
   const old = session;
@@ -51,11 +51,16 @@ async function handle(message) {
       chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId
     } }, video: false });
     if (!stream.getAudioTracks().length) throw new Error('标签页没有可用音轨');
-    context = new AudioContext({ latencyHint: 'interactive' });
+    context = new AudioContext({ latencyHint: 'interactive', sampleRate: 48000 });
     const source = context.createMediaStreamSource(stream);
-    graph = ICourseVoice.createVoiceGraph(context, source);
+    graph = ICourseVoice.createVoiceGraph(context, source, () => {
+      if (session?.graph !== graph) return;
+      void chrome.runtime.sendMessage({ target: 'voice-background', type: 'enhancement-changed', tabId: session.tabId }).catch(() => {});
+    });
     await context.resume();
     if (context.state !== 'running') throw new Error('浏览器未能启动音频输出');
+    graph.setEnabled(true);
+    if (graph.loadDenoiser) await graph.loadDenoiser(chrome.runtime.getURL('vendor/rnnoise-worklet.js'));
     session = { stream, context, graph, source, clock: message.clock, asr: null, tabId: message.tabId, enabled: true };
     graph.setEnabled(true);
     if (message.asr) await configureASR(true, message.clock, message.engine, message.courseId, message.config);

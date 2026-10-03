@@ -335,7 +335,7 @@
       const result = await voiceRequest('toggle');
       if (token !== state.loadToken || panel.hidden) return;
       state.audio = result.active ? result : null;
-      status(result.enabled ? '人声增强已开启：温和均衡与动态压缩。' : '已切回原声；点击工具栏图标可停止音频捕获。');
+      status(result.enabled ? (result.mode === 'rnnoise' ? '人声增强已开启：持续背景降噪与温和均衡。' : '已启用基础增强；背景降噪暂不可用。') : '已切回原声；点击工具栏图标可停止音频捕获。');
     } catch (error) {
       if (token === state.loadToken && !panel.hidden) status(error.message + '（右上角 🧩 → Lyue；视频需正在播放）', false);
     } finally {
@@ -357,7 +357,7 @@
     if (!state.audio && isStreaming()) { $('.icp-local-caption').hidden = true; $('.icp-subtitle-status').textContent = '本地识别已停止 · 工具栏图标可重新启动'; }
     updateDenoiseButton();
     if (message.error) status('无法启用人声增强：' + message.error, true);
-    else if (state.audio) status(state.audio.enabled ? '人声增强已开启；请避免页面中的其他播放器同时发声。' : '已切回原声，音频捕获仍在运行。');
+    else if (state.audio) status(state.audio.enabled ? (state.audio.mode === 'rnnoise' ? '人声增强已开启：持续背景降噪。' : '已启用基础增强；背景降噪暂不可用。') : '已切回原声，音频捕获仍在运行。');
   });
 
   function close() {

@@ -3,9 +3,11 @@
   "private": true,
   "scripts": {
     "build:player": "esbuild scripts/sutro-entry.js --bundle --format=iife --target=chrome116 --minify --outfile=vendor/sutro.js",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "build:audio": "esbuild scripts/rnnoise-entry.js --bundle --format=esm --target=chrome116 --minify --outfile=vendor/rnnoise-worklet.js"
   },
   "dependencies": {
+    "@jitsi/rnnoise-wasm": "0.2.1",
     "@player.style/sutro": "0.2.1",
     "media-chrome": "4.19.3"
   },
