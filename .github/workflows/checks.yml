@@ -28,6 +28,7 @@ jobs:
       - run: node --check content.js
       - run: node --check background.js
       - run: node --check offscreen.js
+      - run: node --check course-terms.js
       - run: node --check voice.js
       - run: node --check pcm-worklet.js
       - run: node --test tests/*.test.cjs

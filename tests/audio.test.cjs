@@ -33,7 +33,7 @@ function background() {
       }
     }
   };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../background.js'), 'utf8'), { chrome });
+  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../course-terms.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname, '../background.js'), 'utf8'), { chrome });
   async function click(tabId = 1) { chrome.action.onClicked.fn({ id: tabId }); await tick(); await tick(); }
   const message = (type, tabId = 1, sender = { id: 'test', tab: { id: tabId } }) => new Promise(resolve => {
     if (!chrome.runtime.onMessage.fn({ target: 'voice-background', type }, sender, resolve)) resolve(null);

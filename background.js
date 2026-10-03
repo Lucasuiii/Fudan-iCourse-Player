@@ -1,4 +1,5 @@
 'use strict';
+if(typeof importScripts==='function')importScripts('course-terms.js');
 let queue = Promise.resolve();
 function serialized(task) {
   const job = queue.then(task);
@@ -11,7 +12,7 @@ async function hasOffscreen() {
 async function whisperConfig(courseId) {
   const { whisperKey, whisperPrompts } = await chrome.storage.local.get(['whisperKey', 'whisperPrompts']);
   if (!whisperKey) throw Error('请在“关键词与连接”保存本地服务密钥');
-  return { key: whisperKey, prompt: /^\d{1,10}$/.test(courseId || '') ? (whisperPrompts?.[courseId] || '') : '' };
+  return { key: whisperKey, prompt: ICourseTerms.resolve(courseId,whisperPrompts) };
 }
 async function audio(type, fields = {}) {
   if (!await hasOffscreen()) return { tabId: null, enabled: false };
@@ -98,7 +99,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (streaming && message.type === 'stream' && (await audio('state')).tabId === null) throw Error('音频捕获已停止');
     if (message.type === 'settings') { if (/^\d{1,10}$/.test(message.courseId || '')) await chrome.storage.local.set({ whisperCourseId: message.courseId }); await chrome.runtime.openOptionsPage(); return {}; }
     const { whisperKey, whisperPrompts } = await chrome.storage.local.get(['whisperKey', 'whisperPrompts']);
-    const whisperPrompt = /^\d{1,10}$/.test(message.courseId || '') ? whisperPrompts?.[message.courseId] : '';
+    const whisperPrompt = ICourseTerms.resolve(message.courseId,whisperPrompts);
     if (!whisperKey) throw Error('请先点“Whisper 设置”，填写本地服务连接密钥');
     const response = await fetch('http://127.0.0.1:8766/' + (message.type === 'chunk' ? 'chunk' : message.type === 'stream' ? 'stream' : 'health'), {
       method: message.type === 'health' ? 'GET' : 'POST',
@@ -138,7 +139,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   (async()=>{
     const {whisperKey,whisperPrompts}=await chrome.storage.local.get(['whisperKey','whisperPrompts']);
     if(!whisperKey)throw Error('请在关键词与连接中保存本地服务密钥');
-    const prompt=/^\d{1,10}$/.test(message.courseId||'')?whisperPrompts?.[message.courseId]||'':'';
+    const prompt=ICourseTerms.resolve(message.courseId,whisperPrompts);
     const response=await fetch('http://127.0.0.1:8768/'+(message.type==='media'?'media':message.type==='relay-chunk'?'relay-chunk':message.type==='export-captions'?'export-captions':message.type==='cached-chunk'?'cached-chunk':message.type==='chunk'?'chunk':'health'),{
       method:message.type==='health'?'GET':'POST',signal:controller.signal,
       headers:{Authorization:'Bearer '+whisperKey,'Content-Type':'application/json'},
