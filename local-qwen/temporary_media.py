@@ -76,7 +76,7 @@ class TemporaryMedia:
                 for jid,j in self.jobs.items():
                     if j['entry']==ident and not j['sent']:
                         j['sent']=True;return {'job':{'id':jid,'start':j['start'],'end':j['end']}}
-                return {'job':None}
+                return {'job':None,'phase':e.get('phase','reading')}
             if action=='result':
                 j=self.jobs.get(data.get('jobId'))
                 if not j or j['entry']!=ident:raise ValueError('字节范围请求已过期')
@@ -87,6 +87,11 @@ class TemporaryMedia:
                 if len(raw)!=j['end']-j['start']+1:raise ValueError('字节范围响应不完整')
                 j['data']=raw;j['event'].set();return {'received':True}
             raise ValueError('未知分段读取操作')
+    def phase(self,ident,owner,phase):
+        with self.lock:
+            e=self.entries.get(ident)
+            if e and e['owner']==str(owner):e['phase']=phase
+
     def url(self,ident,owner,key):
         with self.lock:
             e=self.entries.get(ident)

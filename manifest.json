@@ -16,6 +16,7 @@
         "qwen-cache.js",
         "qwen-range.js",
         "subtitle-export.js",
+        "player-transport.js",
         "content.js"
       ],
       "css": [

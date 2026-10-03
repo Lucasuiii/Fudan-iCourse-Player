@@ -237,3 +237,26 @@
 
 #icp-panel .icp-qwen-cancel{font:inherit;font-size:11px;padding:4px 8px;border:1px solid var(--icp-line);border-radius:8px;background:var(--icp-control);color:var(--icp-accent)}
 #icp-panel .icp-qwen-cancel[hidden]{display:none}
+
+/* Keep the video inside its grid cell and transport outside the auto-hiding native controls. */
+#icp-panel .icp-stage{flex:1 1 0;min-height:180px;max-height:none;aspect-ratio:auto;grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1fr)}
+#icp-panel .icp-video{display:block;min-width:0;min-height:0;max-height:100%}
+#icp-panel .icp-transport{flex:none;order:0;padding:2px 0 0}
+#icp-panel .icp-seek-row{display:flex;align-items:center;gap:10px;min-height:28px;font-size:11px;font-variant-numeric:tabular-nums;color:var(--icp-muted)}
+#icp-panel .icp-seek{flex:1;min-width:0;accent-color:var(--icp-accent);cursor:pointer;height:18px;margin:0}
+#icp-panel .icp-cache-heading{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--icp-muted)}
+#icp-panel .icp-cache-meter{width:100%;height:4px;display:block;margin:5px 0;accent-color:var(--icp-accent)}
+#icp-panel .icp-cache-map{position:relative;height:6px;border-radius:3px;overflow:hidden;background:var(--icp-track)}
+#icp-panel .icp-cache-map span{position:absolute;top:0;bottom:0;background:var(--icp-accent)}
+#icp-panel .icp-cache-map .icp-cache-pending{background:repeating-linear-gradient(45deg,#72baff 0 3px,#b4d6ff 3px 6px)}
+#icp-panel .icp-cache-phase{display:block;font-size:10px;color:var(--icp-muted);margin-top:4px;min-height:15px}
+@media(max-width:820px){#icp-panel .icp-stage{flex:none;aspect-ratio:16/9;min-height:0}}
+#icp-panel .icp-stage:fullscreen{aspect-ratio:auto;max-height:none}
+/* The same controls remain below the picture in fullscreen. */
+#icp-panel .icp-tap-target{inset:0}
+#icp-panel .icp-volume{width:64px;min-width:40px;accent-color:var(--icp-accent)}
+#icp-panel .icp-main:fullscreen{display:flex;flex-direction:column;box-sizing:border-box;width:100%;height:100dvh;padding:8px 12px;background:var(--icp-surface-strong);overflow:auto}
+#icp-panel .icp-main:fullscreen .icp-stage{flex:1 1 0;min-height:0;max-height:none;aspect-ratio:auto;border-radius:8px}
+#icp-panel .icp-main:fullscreen .icp-now,#icp-panel .icp-main:fullscreen .icp-hint,#icp-panel .icp-main:fullscreen .icp-sidebar-toggle{display:none}
+#icp-panel .icp-main:fullscreen .icp-tools{flex-direction:row;flex-wrap:wrap;margin:0}
+#icp-panel .icp-main:fullscreen .icp-transport{padding-top:4px}

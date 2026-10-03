@@ -59,3 +59,15 @@ test('turning off whole-course caching retains only the near playback horizon',a
  const c=new Cache({snapshot:()=>pos,request:async x=>{calls.push(x.start);return {start:x.start,cues:[]};},onCues:()=>{},onStatus:()=>{},pause:()=>{},resume:()=>{}});
  try{c.setContinuous(false);c.start();await wait();assert.deepEqual(calls,[0,20,40,60,80]);c.setContinuous(true);await wait();assert.equal(c.completed.size,15);}finally{c.stop();}
 });
+test('progress covers the partial last window and cleared/source-changed caches',async()=>{
+ const pos={source:'clip',duration:45,time:0,rate:1,paused:true};const reports=[];
+ const c=new Cache({snapshot:()=>pos,request:async x=>({start:x.start,cues:[]}),onCues:()=>{},onStatus:()=>{},onProgress:p=>reports.push(p),pause:()=>{},resume:()=>{}});
+ try{c.start();await wait();assert.ok(reports.some(p=>p.start===40&&p.end===45));assert.equal(reports.at(-1).completed,3);assert.equal(reports.at(-1).total,3);assert.equal(reports.at(-1).start,null);
+ c.stop();c.reset(true);assert.equal(reports.at(-1).completed,0);pos.source='other';pos.duration=20;c.start();await wait();assert.equal(reports.at(-1).completed,1);assert.equal(reports.at(-1).total,1);
+ }finally{c.stop();}
+});
+test('near-horizon progress stops showing an active window after completion',async()=>{
+ const pos={source:'clip',duration:300,time:0,rate:1,paused:true};let progress;
+ const c=new Cache({snapshot:()=>pos,request:async x=>({start:x.start,cues:[]}),onCues:()=>{},onStatus:()=>{},onProgress:p=>progress=p,pause:()=>{},resume:()=>{}});
+ try{c.setContinuous(false);c.start();await wait();assert.equal(progress.completed,5);assert.equal(progress.start,null);assert.equal(progress.total,15);}finally{c.stop();}
+});
