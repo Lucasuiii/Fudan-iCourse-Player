@@ -26,34 +26,51 @@
   class QwenCache {
     constructor({snapshot,request,onCues,onStatus,pause,resume}) {
       Object.assign(this,{snapshot,request,onCues,onStatus,pause,resume});
-      this.cache=new Map();this.epoch=0;this.active=false;this.busy=false;this.waiting=false;this.dirty=false;
+      this.cache=new Map();this.completed=new Set();this.continuous=true;this.epoch=0;this.active=false;this.busy=false;this.waiting=false;this.dirty=false;
     }
     start(){this.stop();this.active=true;this.timer=setInterval(()=>this.tick(),500);this.tick();}
     stop(){this.active=false;clearInterval(this.timer);this.epoch++;this.controller?.abort();this.controller=null;this.busy=false;this.release();}
     release(){if(this.waiting){this.waiting=false;const play=this.wasPlaying;this.wasPlaying=false;if(play)this.resume();}}
+    setContinuous(enabled){
+      this.continuous=Boolean(enabled);
+      const s=this.snapshot();
+      if(!this.continuous&&this.busy&&this.requestStart>s.time+100){this.epoch++;this.controller?.abort();this.busy=false;this.controller=null;}
+      if(this.active)this.tick();
+    }
     cancelResume(){this.wasPlaying=false;}
-    reset(clear=false){this.epoch++;this.controller?.abort();this.controller=null;this.busy=false;if(clear)this.cache.clear();this.release();if(this.active)this.tick();}
+    reset(clear=false){this.epoch++;this.controller?.abort();this.controller=null;this.busy=false;if(clear){this.cache.clear();this.completed.clear();}this.release();if(this.active)this.tick();}
     tick(){
       if(!this.active)return;
       const s=this.snapshot();
-      if(!s.source||!Number.isFinite(s.duration)||s.duration<=0||!Number.isFinite(s.time)||s.time<0||s.time>=s.duration||s.live){if(this.busy||this.waiting){this.epoch++;this.controller?.abort();this.busy=false;this.release();}return this.onStatus('Qwen 缓存仅支持已加载的录播',false);}
+      if(!s.source||!Number.isFinite(s.duration)||s.duration<=0||!Number.isFinite(s.time)||s.time<0||s.time>s.duration||s.live){if(this.busy||this.waiting){this.epoch++;this.controller?.abort();this.busy=false;this.release();}return this.onStatus('Qwen 缓存仅支持已加载的录播',false);}
       if(s.rate<0.75||s.rate>2){if(this.busy||this.waiting){this.epoch++;this.controller?.abort();this.busy=false;this.release();}return this.onStatus('Qwen 缓存支持 0.75×–2×，请调整速度',false);}
-      const start=Math.floor(s.time/20)*20;
+      if(this.source!==s.source){this.source=s.source;this.cache.clear();this.completed.clear();}
+      const start=Math.floor(Math.min(s.time,s.duration-0.001)/20)*20;
+      if(this.busy&&!this.cache.has(start)&&this.requestStart!==start){this.epoch++;this.controller?.abort();this.busy=false;this.controller=null;}
+
       const current=this.cache.get(start);
       if(current){this.release();if(this.dirty){this.dirty=false;this.onCues(layout(this.cache.values()));}}
       if(this.busy)return;
       let target=start;
       while(this.cache.has(target)&&target+20<Math.min(s.duration,s.time+100))target+=20;
-      if(this.cache.has(target))return this.onStatus('Qwen · 已缓存前方字幕 · '+s.rate+'×',false);
+      // Keep the near playback horizon ready, then continue through the recording.
+      if(this.cache.has(target)){
+        if(!this.continuous)return this.onStatus('Qwen · 前方字幕已就绪',false);
+        target=start;
+        while(target<s.duration&&this.completed.has(target))target+=20;
+        if(target>=s.duration){target=0;while(target<s.duration&&this.completed.has(target))target+=20;}
+        if(target>=s.duration)return this.onStatus('Qwen · 全课字幕已缓存 · '+this.completed.size+'/'+Math.ceil(s.duration/20),false);
+      }
+
       const epoch=this.epoch,source=s.source;
       if(!current&&!this.waiting){this.waiting=true;this.wasPlaying=!s.paused;if(this.wasPlaying)this.pause();}
-      this.onStatus(!current?'Qwen · 正在准备当前位置字幕…':'Qwen · 正在缓存前方字幕…',this.waiting);
-      this.busy=true;const controller=new AbortController();this.controller=controller;
+      this.onStatus(!current?'Qwen · 正在准备当前位置字幕…':'Qwen · 缓存 '+this.completed.size+'/'+Math.ceil(s.duration/20)+' · '+Math.floor(target/60)+':'+String(target%60).padStart(2,'0'),this.waiting);
+      this.busy=true;this.requestStart=target;const controller=new AbortController();this.controller=controller;
       this.request({source,start:target,duration:s.duration},controller.signal).then(result=>{
         if(!this.active||epoch!==this.epoch||source!==this.snapshot().source)return;
         if(!result||result.start!==target||!Array.isArray(result.cues))throw Error('Qwen 返回了无效字幕窗口');
-        this.cache.set(target,result);this.dirty=true;
-        while(this.cache.size>180){const key=[...this.cache.keys()].find(k=>k!==start);this.cache.delete(key);}
+        this.cache.set(target,result);this.completed.add(target);this.dirty=true;
+        while(this.cache.size>180){const key=[...this.cache.keys()].filter(k=>k!==start).sort((a,b)=>Math.abs(b-start)-Math.abs(a-start))[0];this.cache.delete(key);}
       }).catch(error=>{
         if(epoch!==this.epoch||!this.active||error.name==='AbortError')return;
         this.active=false;clearInterval(this.timer);this.release();this.onStatus(error.message,false);

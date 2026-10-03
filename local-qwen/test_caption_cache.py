@@ -34,3 +34,17 @@ class CaptionCacheTests(unittest.TestCase):
         self.assertTrue(cues[0]['text'].endswith('。'))
 
 if __name__=='__main__':unittest.main()
+
+class CaptionExportTests(unittest.TestCase):
+    def test_export_reads_all_saved_windows_beyond_page_memory_and_excludes_other_terms(self):
+        with tempfile.TemporaryDirectory() as d:
+            e=Engine.__new__(Engine);e.cache=Path(d);e.model_id='model'
+            source='https://icourse.fudan.edu.cn/lesson.mp4'
+            for start in [0,40]:
+                p=e.cache/(legacy.cache_key(source,'model','QR',start)+'.json')
+                p.write_text(json.dumps({'start':start,'end':start+20,'audio_start':start,'words':[{'start':0,'end':1,'text':'本课'}]}))
+            result=e.export_captions(source+'?signature=renewed',60,'QR')
+            self.assertEqual((result['completed'],result['total']),(2,3))
+            self.assertEqual([w['start'] for w in result['windows']],[0,40])
+            self.assertNotIn('source',json.dumps(result))
+            self.assertEqual(e.export_captions(source,60,'other')['completed'],0)

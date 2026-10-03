@@ -151,6 +151,15 @@ class Engine(legacy.Engine):
             return {**result,'cached':True,'seconds':0}
         except (ValueError,KeyError,TypeError):return None
 
+    def export_captions(self, source, duration, prompt=''):
+        self.cached_chunk(source,0,duration,prompt) # Validate before planning any disk reads.
+        windows=[]
+        for start in range(0,math.ceil(duration),20):
+            result=self.cached_chunk(source,start,duration,prompt)
+            if result is not None:
+                windows.append({k:result[k] for k in ('start','end','cues','alignedWords')})
+        return {'windows':windows,'completed':len(windows),'total':math.ceil(duration/20)}
+
     def chunk(self, source, start, duration, prompt='', relay_id=None, owner=None):
         cached=self.cached_chunk(source,start,duration,prompt)
         if cached is not None:return cached
@@ -212,14 +221,16 @@ def main():
     parent=legacy.handler(engine,key.read_text().strip(),args.port)
     class Handler(parent):
         def do_POST(self):
-            if self.path not in ('/media','/relay-chunk','/cached-chunk'):return super().do_POST()
+            if self.path not in ('/media','/relay-chunk','/cached-chunk','/export-captions'):return super().do_POST()
             if not self.authorized():return self.send(403,{'error':'本地连接密钥无效'})
             try:
                 size=int(self.headers.get('Content-Length','0'))
                 if not 0<size<=400000:raise ValueError('分段读取请求过大')
                 data=json.loads(self.rfile.read(size))
                 if not isinstance(data,dict) or not isinstance(data.get('owner'),str):raise ValueError('分段读取请求无效')
-                if self.path=='/cached-chunk':
+                if self.path=='/export-captions':
+                    result=engine.export_captions(data.get('source'),data.get('duration'),data.get('prompt',''))
+                elif self.path=='/cached-chunk':
                     result=engine.cached_chunk(data.get('source'),data.get('start'),data.get('duration'),data.get('prompt',''))
                 elif self.path=='/relay-chunk':
                     if not isinstance(data.get('relayId'),str):raise ValueError('分段读取会话缺失')

@@ -1,12 +1,12 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const Cache=require('../qwen-cache.js');
 const wait=()=>new Promise(r=>setTimeout(r,0));
-test('Qwen prefetch stays within 100 media seconds and a speed change keeps cached cues',async()=>{
+test('Qwen automatically continues to the end and a speed change keeps cached cues',async()=>{
  let position={source:'clip',duration:200,time:0,rate:2,paused:false,live:false},calls=[],paused=0,resumed=0,cues=[];
  const c=new Cache({snapshot:()=>position,request:async x=>{calls.push(x.start);return {start:x.start,cues:[{start:x.start,end:x.start+20,text:'text'}]};},onCues:x=>cues=x,onStatus:()=>{},pause:()=>paused++,resume:()=>resumed++});
  c.start();await wait();await wait();
- assert.deepEqual(calls,[0,20,40,60,80]);assert.equal(paused,1);assert.equal(resumed,1);assert.equal(cues.length,5);
- position.rate=1.5;c.tick();assert.equal(calls.length,5);c.stop();
+ assert.deepEqual(calls,[0,20,40,60,80,100,120,140,160,180]);assert.equal(paused,1);assert.equal(resumed,1);assert.equal(cues.length,10);
+ position.rate=1.5;c.tick();assert.equal(calls.length,10);c.stop();
 });
 test('seek and restart discard a late result; manual cancel does not force playback',async()=>{
  let pos={source:'clip',duration:500,time:0,rate:1,paused:false},resolve,play=0;
@@ -33,4 +33,29 @@ test('aligned captions reflow across 20-second windows without cutting a sentenc
 test('caption reflow keeps pauses and separate missing-window gaps, and does not split English words',()=>{
  const cues=Cache.layout([{start:0,alignedWords:[{start:0,end:1,text:'QR'},{start:1,end:2,text:'decomposition'},{start:3,end:4,text:'下一句'}]},{start:40,alignedWords:[{start:40,end:41,text:'另一个窗口'}]}]);
  assert.deepEqual(cues.map(c=>c.text),['QR decomposition','下一句','另一个窗口']);
+});
+test('continuous caching fills earlier windows after the end even while paused',async()=>{
+ const pos={source:'clip',duration:100,time:40,rate:1,paused:true};const calls=[];
+ const c=new Cache({snapshot:()=>pos,request:async x=>{calls.push(x.start);return {start:x.start,cues:[]};},onCues:()=>{},onStatus:()=>{},pause:()=>assert.fail('already paused'),resume:()=>assert.fail('manual pause must be retained')});
+ try{c.start();await wait();assert.deepEqual(calls,[40,60,80,0,20]);assert.equal(c.completed.size,5);c.tick();assert.equal(calls.length,5);}finally{c.stop();}
+});
+test('long-course memory eviction does not repeatedly recognize evicted future windows',async()=>{
+ const pos={source:'clip',duration:4200,time:0,rate:2,paused:true};const calls=[];
+ const c=new Cache({snapshot:()=>pos,request:async x=>{calls.push(x.start);return {start:x.start,cues:[]};},onCues:()=>{},onStatus:()=>{},pause:()=>{},resume:()=>{}});
+ try{c.start();await wait();assert.equal(calls.length,210);assert.equal(c.completed.size,210);assert.equal(c.cache.size,180);c.tick();assert.equal(calls.length,210);}finally{c.stop();}
+});
+test('seeking prioritizes the new current window over an in-flight background window',async()=>{
+ let pos={source:'clip',duration:200,time:0,rate:1,paused:true};const pending=[];
+ const c=new Cache({snapshot:()=>pos,request:(x,signal)=>new Promise(resolve=>pending.push({x,signal,resolve})),onCues:()=>{},onStatus:()=>{},pause:()=>{},resume:()=>{}});
+ try{c.start();pos.time=100;c.tick();assert.equal(pending[0].signal.aborted,true);assert.equal(pending[1].x.start,100);pending[0].resolve({start:0,cues:[]});await wait();assert.equal(c.cache.has(0),false);}finally{c.stop();}
+});
+test('background caching can finish remaining windows after playback reaches the end',async()=>{
+ const pos={source:'clip',duration:100,time:100,rate:1,paused:true};const calls=[];
+ const c=new Cache({snapshot:()=>pos,request:async x=>{calls.push(x.start);return {start:x.start,cues:[]};},onCues:()=>{},onStatus:()=>{},pause:()=>{},resume:()=>{}});
+ try{c.start();await wait();assert.deepEqual(calls,[80,0,20,40,60]);}finally{c.stop();}
+});
+test('turning off whole-course caching retains only the near playback horizon',async()=>{
+ const pos={source:'clip',duration:300,time:0,rate:1,paused:true};const calls=[];
+ const c=new Cache({snapshot:()=>pos,request:async x=>{calls.push(x.start);return {start:x.start,cues:[]};},onCues:()=>{},onStatus:()=>{},pause:()=>{},resume:()=>{}});
+ try{c.setContinuous(false);c.start();await wait();assert.deepEqual(calls,[0,20,40,60,80]);c.setContinuous(true);await wait();assert.equal(c.completed.size,15);}finally{c.stop();}
 });
