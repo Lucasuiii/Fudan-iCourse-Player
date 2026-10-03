@@ -48,3 +48,14 @@ test('480-sample frames span 128-sample render blocks without dropping audio; mo
   assert.ok(rms(left, 4800) > 0);
   node.port.onmessage({ data: 'dispose' });
 });
+test('light blend uses raw samples aligned with measured RNNoise 0.2 latency of 1440 samples',()=>{
+ const standard=processor(),light=processor();
+ standard.port.onmessage({data:{type:'configure',settings:{level:false}}});
+ light.port.onmessage({data:{type:'configure',settings:{strength:'light',level:false}}});
+ const input=Float32Array.from({length:48000},(_,i)=>.1*Math.sin(i*.017+i*i*.0000001));
+ const [wet]=render(standard,input),[mixed]=render(light,input);
+ let error=0;
+ for(let i=24000;i<input.length;i++)error=Math.max(error,Math.abs(mixed[i]-(.8*wet[i]+.2*input[i-1440])));
+ assert.ok(error<1e-6,`aligned mix error ${error}`);
+ standard.port.onmessage({data:'dispose'});light.port.onmessage({data:'dispose'});
+});

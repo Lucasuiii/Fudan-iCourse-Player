@@ -3,7 +3,7 @@
 let session = null;
 let queue = Promise.resolve();
 function snapshot() {
-  return session ? { tabId: session.tabId, enabled: session.enabled, ...(session.graph.mode ? { mode: session.graph.mode } : {}) } : { tabId: null, enabled: false };
+  return session ? { tabId: session.tabId, enabled: session.enabled, ...(session.graph.mode ? { mode: session.graph.mode, settings: session.graph.settings } : {}) } : { tabId: null, enabled: false };
 }
 async function stop() {
   const old = session;
@@ -31,6 +31,11 @@ async function handle(message) {
   if (message.type === 'clock') { if (session?.tabId === message.tabId) { session.clock = message.clock; session.asr?.setClock(message.clock); } return snapshot(); }
   if (message.type === 'asr') { if (session?.tabId === message.tabId) await configureASR(message.enabled, message.clock, message.engine, message.courseId, message.config); return snapshot(); }
   if (message.type === 'state') return snapshot();
+  if (message.type === 'configure') {
+    if (session?.tabId !== message.tabId) throw Error('音频捕获已停止，请重新启用');
+    session.graph.configure(message.settings);
+    return snapshot();
+  }
   if (message.type === 'stop') {
     if (session?.tabId === message.tabId) await stop();
     return snapshot();
@@ -57,6 +62,7 @@ async function handle(message) {
       if (session?.graph !== graph) return;
       void chrome.runtime.sendMessage({ target: 'voice-background', type: 'enhancement-changed', tabId: session.tabId }).catch(() => {});
     });
+    graph.configure?.(message.settings);
     await context.resume();
     if (context.state !== 'running') throw new Error('浏览器未能启动音频输出');
     graph.setEnabled(true);
