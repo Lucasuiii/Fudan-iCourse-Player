@@ -6,7 +6,7 @@ function app(){
  const listeners=[],calls=[];
  const event={addListener(){}};
  const chrome={runtime:{id:'own',getURL:p=>'chrome-extension://own/'+p,onMessage:{addListener:f=>listeners.push(f)}},tabs:{onRemoved:event,onUpdated:event},action:{onClicked:event},storage:{local:{get:async()=>({whisperKey:'private',whisperPrompts:{'11':'QR 分解'}})}}};
- vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../background.js'),'utf8'),{chrome,AbortSignal,AbortController,setTimeout,clearTimeout,fetch:async(url,init)=>{calls.push({url,init});return {ok:true,json:async()=>({cues:[]})};}});
+ vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../course-terms.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../background.js'),'utf8'),{chrome,AbortSignal,AbortController,setTimeout,clearTimeout,fetch:async(url,init)=>{calls.push({url,init});return {ok:true,json:async()=>({cues:[]})};}});
  const send=(message,sender={id:'own',tab:{id:1}})=>new Promise(resolve=>{let waiting=false;for(const f of listeners)waiting=f({target:'whisper-background',courseId:'11',...message},sender,resolve)===true||waiting;if(!waiting)resolve(null);});
  return {send,calls,chrome};
 }
@@ -34,7 +34,7 @@ test('PCM inference accepts only the extension offscreen owner with active captu
 test('saved terms notify matching-course players without exposing key or prompt',async()=>{
  let changed;const notices=[];const event={addListener(){}};
  const chrome={runtime:{id:'own',getURL:p=>'chrome-extension://own/'+p,onMessage:event},tabs:{onRemoved:event,onUpdated:event,query:async()=>[{id:1}],sendMessage:async(id,m)=>notices.push(m)},action:{onClicked:event},storage:{onChanged:{addListener:f=>changed=f}}};
- vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../background.js'),'utf8'),{chrome});
+ vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../course-terms.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../background.js'),'utf8'),{chrome});
  changed({whisperPrompts:{oldValue:{'11':'old','22':'unchanged'},newValue:{'11':'QR 分解','22':'unchanged'}}},'local');
  await new Promise(r=>setImmediate(r));assert.deepEqual(Array.from(notices[0].courseIds),['11']);assert.equal(JSON.stringify(notices).includes('QR'),false);
  changed({whisperKey:{oldValue:'secret',newValue:'newsecret'}},'local');await new Promise(r=>setImmediate(r));assert.equal(notices[1].all,true);assert.equal(JSON.stringify(notices).includes('secret'),false);
@@ -57,4 +57,12 @@ test('Qwen cache lookup uses trusted glossary and owner, and options pages canno
  assert.equal(a.calls[0].url,'http://127.0.0.1:8768/cached-chunk');
  const data=JSON.parse(a.calls[0].init.body);assert.equal(data.owner,'1');assert.equal(data.prompt,'QR 分解');
  assert.equal(await a.send(message,{id:'own',url:'chrome-extension://own/options.html'}),null);
+});
+
+test('Qwen inference, cache lookup, export and Whisper use identical numerical-analysis context',async()=>{
+ const a=app();
+ for(const type of ['chunk','cached-chunk','export-captions'])assert.equal((await a.send({target:'qwen-background',type,courseId:'38146',requestId:type,chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100,prompt:'caller spoof'}})).ok,true);
+ assert.equal((await a.send({type:'chunk',courseId:'38146',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100}})).ok,true);
+ const prompts=a.calls.map(c=>JSON.parse(c.init.body).prompt);
+ assert.equal(new Set(prompts).size,1);assert.match(prompts[0],/α 阿尔法/);assert.equal(prompts[0].includes('caller spoof'),false);
 });
