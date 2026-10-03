@@ -589,11 +589,14 @@
   async function downloadQwenMedia(source,signal){
     let id,reader,finished=false;
     try{
-      const response=await fetch(source,{credentials:'include',signal});
-      if(!response.ok)throw Error('浏览器下载失败：HTTP '+response.status+'，请重新选择课次');
+      const user=await core.api(ctx,'/userapi/v1/infosimple',{}, {signal});
+      const fresh=core.signVideo(source,user.params||user.data||{});
+      const response=await fetch(fresh,{credentials:'include',headers:{Range:'bytes=0-'},signal});
+      if(!response.ok){await response.body?.cancel();throw Error('浏览器下载失败：HTTP '+response.status+'，请重新选择课次');}
       const total=Number(response.headers.get('content-length'));
-      if(total>2*1024**3)throw Error('临时视频超过 2 GiB 上限');
-      ({id}=await qwenMedia({action:'begin',source}));
+      if(total>8*1024**3){await response.body?.cancel();throw Error('临时视频超过 8 GiB 上限');}
+      try{({id}=await qwenMedia({action:'begin',source,total}));}
+      catch(error){await response.body?.cancel();throw error;}
       if(signal.aborted)throw new DOMException('已取消','AbortError');
       reader=response.body.getReader();let offset=0;
       while(true){

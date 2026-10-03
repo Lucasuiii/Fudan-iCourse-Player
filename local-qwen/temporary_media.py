@@ -2,11 +2,12 @@
 import base64
 from pathlib import Path
 import secrets
+import shutil
 import tempfile
 import threading
 import time
 
-LIMIT=2*1024**3
+LIMIT=8*1024**3
 class TemporaryMedia:
     def __init__(self):
         self.directory=tempfile.TemporaryDirectory(prefix='lyue-media-')
@@ -28,6 +29,9 @@ class TemporaryMedia:
                     if e['owner']==owner:self._remove(ident)
                 return {'released':True}
             if action=='begin':
+                total=data.get('total') or 0
+                if isinstance(total,bool) or not isinstance(total,(int,float)) or not 0<=total<=LIMIT:raise ValueError('视频大小无效或超过 8 GiB')
+                if shutil.disk_usage(self.directory.name).free < total+1024**3:raise ValueError('临时下载磁盘空间不足')
                 if len(self.entries)>=2:raise ValueError('临时下载已达上限，请关闭其他播放器')
                 ident=secrets.token_hex(16);path=Path(self.directory.name)/(ident+'.mp4');path.touch(mode=0o600)
                 self.entries[ident]={'owner':owner,'key':key,'path':path,'size':0,'ready':False,'touched':time.monotonic()}
@@ -41,7 +45,8 @@ class TemporaryMedia:
                 encoded=data.get('data','')
                 if not isinstance(encoded,str) or len(encoded)>700000:raise ValueError('下载分块过大')
                 raw=base64.b64decode(encoded,validate=True)
-                if not raw or e['size']+len(raw)>LIMIT:raise ValueError('临时视频超过 2 GiB 上限')
+                if not raw or e['size']+len(raw)>LIMIT:raise ValueError('临时视频超过 8 GiB 上限')
+                if shutil.disk_usage(self.directory.name).free < len(raw)+1024**3:raise ValueError('临时下载磁盘空间不足')
                 with e['path'].open('ab') as f:f.write(raw)
                 e['size']+=len(raw);e['touched']=time.monotonic();return {'bytes':e['size']}
             if action=='finish':

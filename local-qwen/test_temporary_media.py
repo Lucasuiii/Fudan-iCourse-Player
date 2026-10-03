@@ -1,5 +1,6 @@
 import base64
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 from temporary_media import TemporaryMedia
 from service import audio_read_error
@@ -18,6 +19,13 @@ class TemporaryMediaTests(unittest.TestCase):
             path=m.get('video');self.assertTrue(path.exists())
             m.transfer({'owner':'2','action':'release'},None);self.assertTrue(path.exists())
             m.transfer({'owner':'1','action':'release'},None);self.assertFalse(path.exists())
+        finally:m.directory.cleanup()
+    def test_disk_space_rejection_leaves_no_partial_file(self):
+        m=TemporaryMedia()
+        try:
+            with patch('temporary_media.shutil.disk_usage',return_value=SimpleNamespace(free=1024)):
+                with self.assertRaisesRegex(ValueError,'磁盘空间不足'):m.transfer({'owner':'1','action':'begin','total':10000},'video')
+            self.assertFalse(m.entries)
         finally:m.directory.cleanup()
     def test_expiration_and_safe_error_category(self):
         m=TemporaryMedia()
