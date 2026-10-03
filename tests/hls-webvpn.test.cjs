@@ -40,7 +40,7 @@ test('actual startLive loads absolute variants, segments and AES keys through th
  const video={play:async()=>{}},elements=new Map();
  const state={loadToken:1,courseId:'11'},panel={hidden:false};
  Object.assign(a.scope,{Hls,core:a.c,ctx:{vpn:true},location:{hostname:'webvpn.fudan.edu.cn',href:a.c.vpnUrl('https://icourse.fudan.edu.cn/coursedetail?course_id=11')},state,panel,video,
-  resetVideo(){},renderList(){},updateCaptionButton(){},renderTranscript(){},status(message){a.status=message;},
+  preferredSpeed:()=>1,resetVideo(){},renderList(){},updateCaptionButton(){},renderTranscript(){},status(message){a.status=message;},
   $:selector=>{if(!elements.has(selector))elements.set(selector,{value:'1'});return elements.get(selector);}});
  const content=fs.readFileSync(path.join(__dirname,'../content.js'),'utf8');
  vm.runInNewContext(content.slice(content.indexOf('  async function startLive('),content.indexOf('  function goLive()')),a.scope);
