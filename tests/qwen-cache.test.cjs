@@ -71,3 +71,32 @@ test('near-horizon progress stops showing an active window after completion',asy
  const c=new Cache({snapshot:()=>pos,request:async x=>({start:x.start,cues:[]}),onCues:()=>{},onStatus:()=>{},onProgress:p=>progress=p,pause:()=>{},resume:()=>{}});
  try{c.setContinuous(false);c.start();await wait();assert.equal(progress.completed,5);assert.equal(progress.start,null);assert.equal(progress.total,15);}finally{c.stop();}
 });
+
+test('initial wait resumes at five seconds while inference continues; later gaps do not pause again',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date'],now:0});
+ const pos={source:'clip',duration:200,time:0,rate:1,paused:false},pending=[];let pauses=0,resumes=0;
+ const c=new Cache({snapshot:()=>pos,request:(x,signal)=>new Promise(resolve=>pending.push({x,signal,resolve})),onCues:()=>{},onStatus:()=>{},pause:()=>{pauses++;pos.paused=true;},resume:()=>{resumes++;pos.paused=false;}});
+ try{c.start();assert.equal(pauses,1);t.mock.timers.tick(4999);assert.equal(resumes,0);t.mock.timers.tick(1);assert.equal(resumes,1);assert.equal(c.waiting,false);assert.equal(c.active,true);assert.equal(pending[0].signal.aborted,false);
+ pos.time=20;c.tick();assert.equal(pauses,1);assert.equal(pending[1].x.start,20);
+ pending[1].resolve({start:20,cues:[{start:20,end:40,text:'ready'}]});await Promise.resolve();await Promise.resolve();await Promise.resolve();assert.equal(c.cache.has(20),true);assert.equal(resumes,1);
+ }finally{c.stop();}
+});
+test('a manual pause remains paused at the wait deadline and stopping clears the deadline',t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date'],now:0});
+ const pos={source:'clip',duration:100,time:0,rate:1,paused:false};let resumes=0;
+ const c=new Cache({snapshot:()=>pos,request:()=>new Promise(()=>{}),onCues:()=>{},onStatus:()=>{},pause:()=>{pos.paused=true;},resume:()=>resumes++});
+ c.start();c.cancelResume();t.mock.timers.tick(5000);assert.equal(resumes,0);c.stop();t.mock.timers.tick(10000);assert.equal(resumes,0);
+ pos.paused=false;c.start();c.cancelResume();c.stop();t.mock.timers.tick(5000);assert.equal(resumes,0);
+});
+test('no-wait setting never pauses playback and seeking grants a new bounded preparation',t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date'],now:0});
+ const pos={source:'clip',duration:100,time:0,rate:1,paused:false};let pauses=0,resumes=0;
+ const c=new Cache({snapshot:()=>pos,waitLimitMs:0,request:()=>new Promise(()=>{}),onCues:()=>{},onStatus:()=>{},pause:()=>{pauses++;pos.paused=true;},resume:()=>{resumes++;pos.paused=false;}});
+ try{c.start();assert.equal(pauses,0);assert.equal(c.waiting,false);c.setWaitLimit(3000);pos.time=40;c.reset();assert.equal(pauses,1);t.mock.timers.tick(3000);assert.equal(resumes,1);assert.equal(c.waiting,false);}finally{c.stop();}
+});
+test('changing the limit during preparation counts time already spent waiting',t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date'],now:0});
+ const pos={source:'clip',duration:100,time:0,rate:1,paused:false};let resumes=0;
+ const c=new Cache({snapshot:()=>pos,request:()=>new Promise(()=>{}),onCues:()=>{},onStatus:()=>{},pause:()=>{pos.paused=true;},resume:()=>{resumes++;pos.paused=false;}});
+ try{c.start();t.mock.timers.tick(2000);c.setWaitLimit(3000);t.mock.timers.tick(999);assert.equal(resumes,0);t.mock.timers.tick(1);assert.equal(resumes,1);t.mock.timers.tick(10000);assert.equal(resumes,1);}finally{c.stop();}
+});
