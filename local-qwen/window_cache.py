@@ -31,7 +31,7 @@ def digest_file(path):
 
 class WindowCache:
     def __init__(self, audio, cache, infer, model_id, *, context='', offset=0, window=20, overlap=2, limit=1800):
-        if not math.isfinite(offset) or offset < 0 or window != 20 or overlap != 2 or limit < 1:
+        if not math.isfinite(offset) or offset < 0 or window != 20 or overlap != 2 or (limit is not None and limit < 1):
             raise ValueError('Invalid window configuration')
         if not isinstance(context, str) or len(context) > 800:
             raise ValueError('Course terms must be a string of at most 800 characters')
@@ -94,5 +94,6 @@ class WindowCache:
         finally:
             if Path(temporary).exists(): Path(temporary).unlink()
         entries = sorted(self.cache.glob('*.json'), key=lambda p: p.stat().st_mtime)
-        for old in entries[:-self.limit]: old.unlink()
+        if self.limit is not None:
+            for old in entries[:-self.limit]: old.unlink()
         return result

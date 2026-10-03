@@ -47,23 +47,36 @@ def remote_input_options(source):
             '-reconnect','1','-reconnect_on_network_error','1','-reconnect_max_retries','2','-reconnect_delay_total_max','5']
 
 
-def group_words(words, offset, start, end):
-    """Assign each aligned word once by midpoint; group into short readable cues."""
-    selected = []
+def owned_words(words, offset, start, end):
+    selected=[]
     for w in words:
-        a, b = float(w['start']) + offset, float(w['end']) + offset
-        text = str(w['text']).strip()
-        if text and math.isfinite(a+b) and b >= a and start <= (a+b)/2 < end:
-            selected.append({'start':max(start,a),'end':min(end,max(a+0.02,b)), 'text':text})
-    selected.sort(key=lambda w:w['start'])
-    cues = []
-    for w in selected:
-        if not cues or len(cues[-1]['text']) >= 22 or w['start']-cues[-1]['end'] > 0.6 or w['end']-cues[-1]['start'] > 5:
-            cues.append(dict(w))
+        a,b=float(w['start'])+offset,float(w['end'])+offset
+        text=str(w['text']).strip()
+        if text and math.isfinite(a+b) and b>=a and start<=(a+b)/2<end:
+            selected.append({'start':max(start,a),'end':min(end,max(a+0.02,b)),'text':text})
+    return sorted(selected,key=lambda w:w['start'])
+
+
+def group_words(words, offset, start, end):
+    """Prefer punctuation and pauses; length is a safety limit, not a fixed cut."""
+    cues=[]
+    selected=owned_words(words,offset,start,end)
+    for i,w in enumerate(selected):
+        upcoming=''.join(x['text'] for x in selected[i:i+6])
+        prev=cues[-1] if cues else None
+        boundary=prev and (re.search(r'[。！？!?；;]$',prev['text']) or
+            w['start']-prev['end']>0.6 or
+            (len(prev['text'])>=12 and (re.search(r'[，,：:]$',prev['text']) or w['start']-prev['end']>0.35 or re.match(r'但是|所以|然后|不过|因此|接下来|另外|也就是说',upcoming))) or
+            len(prev['text'])+len(w['text'])>36 or w['end']-prev['start']>8)
+        if not prev or boundary:cues.append(dict(w))
         else:
-            prev=cues[-1]
-            space=' ' if prev['text'][-1:].isascii() and w['text'][:1].isascii() else ''
+            space=' ' if re.search(r'[A-Za-z0-9]$',prev['text']) and re.match(r'[A-Za-z0-9]',w['text']) else ''
             prev['text']+=space+w['text'];prev['end']=max(prev['end'],w['end'])
+    if len(cues)>1:
+        prev,last=cues[-2:]
+        if len(last['text'])<6 and len(prev['text'])+len(last['text'])<=40 and last['end']-prev['start']<=9 and last['start']-prev['end']<=0.35 and not re.search(r'[。！？!?；;]$',prev['text']):
+            space=' ' if re.search(r'[A-Za-z0-9]$',prev['text']) and re.match(r'[A-Za-z0-9]',last['text']) else ''
+            prev['text']+=space+last['text'];prev['end']=last['end'];cues.pop()
     return cues
 
 
@@ -123,26 +136,34 @@ class Engine(legacy.Engine):
 
     def stream(self, *_):raise RuntimeError('Qwen 缓存模式只支持录播，请选择 Qwen 录播缓存')
 
-    def chunk(self, source, start, duration, prompt='', relay_id=None, owner=None):
+    def cached_chunk(self, source, start, duration, prompt=''):
         legacy.validate_source(source)
-        if isinstance(start,bool) or not isinstance(start,int) or start < 0 or start%20 or start > 86400:
-            raise ValueError('分段位置无效')
-        if isinstance(duration,bool) or not isinstance(duration,(int,float)) or not math.isfinite(duration) or not start < duration <= 86400:
-            raise ValueError('录播时长无效')
+        if isinstance(start,bool) or not isinstance(start,int) or start<0 or start%20 or start>86400:raise ValueError('分段位置无效')
+        if isinstance(duration,bool) or not isinstance(duration,(int,float)) or not math.isfinite(duration) or not start<duration<=86400:raise ValueError('录播时长无效')
         if not isinstance(prompt,str) or len(prompt)>800:raise ValueError('术语提示太长')
+        path=self.cache/(legacy.cache_key(source,self.model_id,prompt,start)+'.json')
+        if not path.exists():return None
+        try:
+            result=json.loads(path.read_text())
+            if result['start']!=start or result['end']!=min(duration,start+20) or not isinstance(result['words'],list):return None
+            result['cues']=group_words(result['words'],result['audio_start'],start,result['end'])
+            result['alignedWords']=owned_words(result['words'],result['audio_start'],start,result['end'])
+            return {**result,'cached':True,'seconds':0}
+        except (ValueError,KeyError,TypeError):return None
+
+    def chunk(self, source, start, duration, prompt='', relay_id=None, owner=None):
+        cached=self.cached_chunk(source,start,duration,prompt)
+        if cached is not None:return cached
         if not self.lock.acquire(timeout=120):raise RuntimeError('Qwen 正忙，请稍后重试')
         began=time.monotonic()
         try:
             clip=usable_clip(self.local_clip(source),start,min(duration,start+20))
             if clip and clip[0].suffix.lower()=='.wav':
-                cache=WindowCache(clip[0],self.cache,self.infer,self.model_id,context=prompt,offset=clip[1])
+                cache=WindowCache(clip[0],self.cache,self.infer,self.model_id,context=prompt,offset=clip[1],limit=None)
                 result=cache.get(start)
             else:
                 key=legacy.cache_key(source,self.model_id,prompt,start)
                 destination=self.cache/(key+'.json')
-                if destination.exists():
-                    result=json.loads(destination.read_text());result['cached']=True
-                    return result
                 offset=max(0,start-2);end=min(duration,start+20);length=min(duration,end+2)-offset
                 local=clip[0] if clip else self.local_media(source)
                 relay=self.media.url(relay_id,owner,legacy.recording_key(source)) if relay_id else None
@@ -161,11 +182,13 @@ class Engine(legacy.Engine):
                         decoded=self.infer(f.readframes(f.getnframes()),prompt)
                     if decoded['truncated']:raise RuntimeError('模型输出被截断，请重试')
                     result={'start':start,'end':end,'audio_start':offset,'text':decoded['text'],'words':decoded['segments'],'cached':False}
-                result['cues']=group_words(result['words'],offset,start,end)
-                temp=destination.with_suffix('.tmp');temp.write_text(json.dumps(result,ensure_ascii=False));temp.chmod(0o600);temp.replace(destination)
-                files=sorted(self.cache.glob('*.json'),key=lambda p:p.stat().st_mtime)
-                for old in files[:-1800]:old.unlink()
-            result['cues']=group_words(result.get('words',[]),result['audio_start'],start,min(duration,start+20))
+            result['end']=min(duration,start+20)
+            result['cues']=group_words(result.get('words',[]),result['audio_start'],start,result['end'])
+            result['alignedWords']=owned_words(result.get('words',[]),result['audio_start'],start,result['end'])
+            result['recordingId']=legacy.recording_key(source)
+            result['timing']='word-aligned'
+            destination=self.cache/(legacy.cache_key(source,self.model_id,prompt,start)+'.json')
+            temp=destination.with_suffix('.tmp');temp.write_text(json.dumps(result,ensure_ascii=False));temp.chmod(0o600);temp.replace(destination)
             result['seconds']=time.monotonic()-began;self.last_rtf=result['seconds']/20
             return result
         finally:self.lock.release()
@@ -189,14 +212,16 @@ def main():
     parent=legacy.handler(engine,key.read_text().strip(),args.port)
     class Handler(parent):
         def do_POST(self):
-            if self.path not in ('/media','/relay-chunk'):return super().do_POST()
+            if self.path not in ('/media','/relay-chunk','/cached-chunk'):return super().do_POST()
             if not self.authorized():return self.send(403,{'error':'本地连接密钥无效'})
             try:
                 size=int(self.headers.get('Content-Length','0'))
                 if not 0<size<=400000:raise ValueError('分段读取请求过大')
                 data=json.loads(self.rfile.read(size))
                 if not isinstance(data,dict) or not isinstance(data.get('owner'),str):raise ValueError('分段读取请求无效')
-                if self.path=='/relay-chunk':
+                if self.path=='/cached-chunk':
+                    result=engine.cached_chunk(data.get('source'),data.get('start'),data.get('duration'),data.get('prompt',''))
+                elif self.path=='/relay-chunk':
                     if not isinstance(data.get('relayId'),str):raise ValueError('分段读取会话缺失')
                     result=engine.chunk(data.get('source'),data.get('start'),data.get('duration'),data.get('prompt',''),data.get('relayId'),data['owner'])
                 else:

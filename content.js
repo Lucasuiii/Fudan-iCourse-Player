@@ -594,6 +594,9 @@
     const request=(type,relayId)=>chrome.runtime.sendMessage({target:'qwen-background',type,chunk,relayId,requestId,courseId:state.currentCourseId||state.courseId});
     try{
       if(signal.aborted)throw new DOMException('已取消','AbortError');
+      const saved=await request('cached-chunk');
+      if(!saved?.ok)throw Error(saved?.error||'本地字幕缓存未响应');
+      if(saved.result){$('.icp-subtitle-status').textContent='Qwen · 已读取本地字幕';return saved.result;}
       let reply=qwenRelaySources.has(chunk.source)?null:await request('chunk');
       if((!reply||(!reply.ok&&/读取录播失败/.test(reply.error||'')))&&!signal.aborted){
         $('.icp-subtitle-status').textContent='Qwen · 正在准备当前窗口的分段读取…';

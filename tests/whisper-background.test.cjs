@@ -51,3 +51,10 @@ test('relay inference uses the trusted tab owner and scoped course prompt',async
  const a=app();const r=await a.send({target:'qwen-background',type:'relay-chunk',requestId:'relay',relayId:'range-token',owner:'spoof',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:20,duration:100,prompt:'untrusted'}});
  assert.equal(r.ok,true);assert.equal(a.calls[0].url,'http://127.0.0.1:8768/relay-chunk');const body=JSON.parse(a.calls[0].init.body);assert.equal(body.owner,'1');assert.equal(body.relayId,'range-token');assert.equal(body.prompt,'QR 分解');
 });
+test('Qwen cache lookup uses trusted glossary and owner, and options pages cannot read captions',async()=>{
+ const a=app();const message={target:'qwen-background',type:'cached-chunk',courseId:'11',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:20,duration:100},owner:'forged'};
+ const reply=await a.send(message);assert.equal(reply.ok,true);
+ assert.equal(a.calls[0].url,'http://127.0.0.1:8768/cached-chunk');
+ const data=JSON.parse(a.calls[0].init.body);assert.equal(data.owner,'1');assert.equal(data.prompt,'QR 分解');
+ assert.equal(await a.send(message,{id:'own',url:'chrome-extension://own/options.html'}),null);
+});
