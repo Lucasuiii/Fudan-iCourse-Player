@@ -18,7 +18,7 @@
   panel.hidden = true;
   panel.innerHTML = `
     <div class="icp-shell" role="dialog" aria-modal="true" aria-label="Lyue" tabindex="-1">
-      <header class="icp-header"><div class="icp-brand"><span class="icp-mark">▶</span><div><small>LYUE · 1.1.2</small><h2>Lyue</h2></div></div><button class="icp-sidebar-toggle" type="button" aria-expanded="true" aria-controls="icp-sidebar">收起侧栏</button><button class="icp-close" type="button" title="关闭" aria-label="关闭播放器">×</button></header>
+      <header class="icp-header"><div class="icp-brand"><span class="icp-mark">▶</span><div><small>LYUE · 1.1.3</small><h2>Lyue</h2></div></div><button class="icp-sidebar-toggle" type="button" aria-expanded="true" aria-controls="icp-sidebar">收起侧栏</button><button class="icp-close" type="button" title="关闭" aria-label="关闭播放器">×</button></header>
       <details class="icp-course-switch"><summary>切换课程 / 直播</summary><div class="icp-topbar"><label>课程 ID <input class="icp-course-id" inputmode="numeric" placeholder="从课程网址获取" aria-label="课程 ID"></label><button class="icp-load" type="button">打开课程 <span aria-hidden="true">→</span></button><details class="icp-livebox"><summary>连接直播流</summary><div class="icp-livebar"><label>HLS 直播地址 <input class="icp-live-url" type="url" placeholder="粘贴有权限的 .m3u8 地址" aria-label="HLS 直播地址"></label><button class="icp-live-open" type="button">播放直播</button></div></details></div></details>
       <div class="icp-statusbar"><p class="icp-status" role="status">在 iCourse 登录后输入课程 ID，或从课程页面自动识别。</p><span class="icp-subtitle-status" role="status">字幕未加载</span><button class="icp-qwen-cancel" type="button" hidden>取消准备</button></div>
       <div class="icp-layout">
@@ -729,6 +729,9 @@
       video.playbackRate = preferredSpeed();
       $('.icp-placeholder').hidden = true;
       status('视频已就绪。');
+      // Each recording opens with Qwen; live playback keeps its separate subtitle path.
+      $('.icp-caption-source').value = 'qwen-cache';
+      void changeCaptionSource();
       void loadSubtitles(lecture, token, controller.signal);
       try { await video.play(); if (state.loadToken === token && !panel.hidden) status('正在播放。'); }
       catch (error) {
