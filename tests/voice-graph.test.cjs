@@ -9,7 +9,7 @@ function fixture({ fail = false, pending = false } = {}) {
     for (const key of ['frequency', 'Q', 'gain', 'threshold', 'knee', 'ratio', 'attack', 'release']) n[key] = { ...value };
     nodes.push(n); return n;
   }
-  const context = { sampleRate: 48000, currentTime: 0, destination: node(), createGain: node, createBiquadFilter: node, createDynamicsCompressor: node, audioWorklet: { addModule: async () => { if (fail) throw Error('CSP'); } } };
+  const context = { sampleRate: 48000, currentTime: 0, destination: node(), createGain: node, createBiquadFilter: node, createDynamicsCompressor: node, createWaveShaper: node, audioWorklet: { addModule: async () => { if (fail) throw Error('CSP'); } } };
   const source = node(), recognizer = node(); source.connect(recognizer);
   let worklet;
   globalThis.AudioWorkletNode = class {
@@ -58,4 +58,11 @@ test('initialization deadline keeps playback and prevents a late module from rec
   assert.equal(f.worklet(), undefined);
   assert.equal(f.source.connections.length, 3);
   f.graph.disconnect();
+});
+test('natural/clear tone updates smoothly and processor receives validated controls',async()=>{
+ const f=fixture();await f.graph.loadDenoiser('local');const messages=[];f.worklet().port.postMessage=m=>messages.push(m);
+ const config=f.graph.configure({strength:'light',level:false,tone:'clear',tail:true});
+ assert.deepEqual(config,{strength:'light',level:false,tone:'clear',tail:true});assert.deepEqual(messages.at(-1),{type:'configure',settings:config});
+ assert.ok(f.source.connections.includes(f.recognizer));
+ f.graph.configure({strength:'unsafe',tone:'unsafe',tail:'yes'});assert.deepEqual(f.graph.settings,{strength:'standard',level:true,tone:'natural',tail:false});f.graph.disconnect();
 });

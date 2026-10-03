@@ -1,6 +1,11 @@
 /* Shared by the offscreen page and browser audio checks. */
 (function (root) {
   'use strict';
+  function normalizeSettings(value = {}) {
+    value = value || {};
+    return { strength: value.strength === 'light' ? 'light' : 'standard', level: value.level !== false,
+      tone: value.tone === 'clear' ? 'clear' : 'natural', tail: value.tail === true };
+  }
   function createVoiceGraph(context, source, onFallback = () => {}) {
     const highpass = context.createBiquadFilter();
     highpass.type = 'highpass'; highpass.frequency.value = 85; highpass.Q.value = 0.707;
@@ -21,8 +26,23 @@
     const wet = context.createGain();
     dry.gain.value = 1; wet.gain.value = 0;
     source.connect(dry).connect(context.destination);
-    source.connect(highpass).connect(hum).connect(mud).connect(presence).connect(lowpass).connect(compressor).connect(wet).connect(context.destination);
-    let denoiser = null, disposed = false;
+    const limiter = context.createWaveShaper();
+    limiter.curve = Float32Array.from({ length: 8193 }, (_, i) => {
+      const x = i / 4096 - 1, magnitude = Math.abs(x);
+      return magnitude <= .85 ? x : Math.sign(x) * (.85 + .1 * Math.tanh((magnitude - .85) / .1));
+    });
+    limiter.oversample = '2x';
+    source.connect(highpass).connect(hum).connect(mud).connect(presence).connect(lowpass).connect(compressor).connect(wet).connect(limiter).connect(context.destination);
+    let config = normalizeSettings(), denoiser = null, disposed = false;
+    const applySettings = () => {
+      const clear = config.tone === 'clear', now = context.currentTime;
+      for (const [param, value] of [[highpass.frequency, clear ? 85 : 65], [mud.gain, clear ? -2 : -.5],
+        [presence.gain, clear ? 2.5 : 0], [lowpass.frequency, clear ? 7500 : 16000]]) {
+        param.cancelScheduledValues(now); param.setTargetAtTime(value, now, .04);
+      }
+      denoiser?.port.postMessage({ type: 'configure', settings: config });
+    };
+    applySettings();
     let mode = 'eq';
     const fallback = () => {
       if (!denoiser || disposed) return;
@@ -36,6 +56,8 @@
     };
     return {
       get mode() { return mode; },
+      get settings() { return { ...config }; },
+      configure(value) { config = normalizeSettings(value); applySettings(); return this.settings; },
       async loadDenoiser(url) {
         if (!context.audioWorklet || context.sampleRate !== 48000) return false;
         let candidate, timeout, cancelled = false;
@@ -45,7 +67,7 @@
               await context.audioWorklet.addModule(url);
               if (disposed || cancelled) throw new Error('Audio graph closed');
               candidate = new root.AudioWorkletNode(context, 'lyue-rnnoise', {
-                numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], channelCount: 2, channelCountMode: 'explicit'
+                numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], channelCount: 2, channelCountMode: 'explicit', processorOptions: { settings: config }
               });
               await new Promise((resolve, reject) => {
                 candidate.port.onmessage = ({ data }) => { if (data === 'ready') resolve(); };
@@ -61,6 +83,7 @@
           denoiser = candidate;
           denoiser.onprocessorerror = fallback;
           mode = 'rnnoise';
+          applySettings();
           return true;
         } catch (_) {
           cancelled = true;
@@ -76,9 +99,9 @@
           node.gain.setTargetAtTime(target, now, 0.02);
         }
       },
-      disconnect() { disposed = true; denoiser?.port.postMessage('dispose'); denoiser?.disconnect(); for (const node of [source, highpass, hum, mud, presence, lowpass, compressor, dry, wet]) node.disconnect(); }
+      disconnect() { disposed = true; denoiser?.port.postMessage('dispose'); denoiser?.disconnect(); for (const node of [source, highpass, hum, mud, presence, lowpass, compressor, dry, wet, limiter]) node.disconnect(); }
     };
   }
-  root.ICourseVoice = { createVoiceGraph };
+  root.ICourseVoice = { createVoiceGraph, normalizeSettings };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.ICourseVoice;
 })(globalThis);

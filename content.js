@@ -27,7 +27,7 @@
         <main class="icp-main"><div class="icp-stage"><media-theme-sutro class="icp-theme"><video class="icp-video" slot="media" controls playsinline preload="metadata"></video></media-theme-sutro><div class="icp-local-caption" hidden></div><div class="icp-placeholder"><span>▶</span><strong>选择一节课次，开始观看</strong><small>你的课程 · 更舒服的播放体验</small></div></div>
           <div class="icp-now"><div><small>当前课次</small><strong class="icp-now-title">等待选择课次</strong></div><span class="icp-date"></span></div>
           <div class="icp-tools"><button class="icp-go-live" type="button" hidden>● 回到直播</button><button class="icp-more-toggle" type="button" aria-expanded="false" aria-controls="icp-more">识别与增强</button><details class="icp-cache-progress" hidden><summary class="icp-cache-count">字幕缓存 0/0</summary><div class="icp-cache-detail"><div class="icp-cache-window"></div><progress class="icp-cache-meter" max="1" value="0" aria-label="整课字幕缓存进度"></progress><div class="icp-cache-map" role="img" aria-label="字幕缓存时间分布"></div><small class="icp-cache-phase" role="status"></small></div></details></div>
-          <section class="icp-more" id="icp-more" aria-label="更多播放设置" hidden><div class="icp-toolgroup"><label>来源 <select class="icp-caption-source" aria-label="字幕来源"><option value="platform">平台字幕</option><option value="qwen-cache">Qwen 原版 · 录播缓存</option><option value="whisper-live">Whisper 流式（备用）</option></select></label><label class="icp-qwen-wait-setting" hidden>字幕等待上限 <select class="icp-qwen-wait" aria-label="字幕等待上限"><option value="0">不等待</option><option value="3">3 秒</option><option value="5" selected>5 秒</option><option value="10">10 秒</option><option value="15">15 秒</option></select></label><button class="icp-cache-auto" type="button" aria-pressed="true" hidden>整课缓存：开</button><button class="icp-whisper-settings" type="button">关键词与连接</button><button class="icp-whisper-retry" type="button">重新识别</button><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button></div><div class="icp-caption-options"><label>字幕字号 <select class="icp-caption-size"><option value="small">小</option><option value="medium" selected>标准</option><option value="large">大</option></select></label><label>字幕背景 <select class="icp-caption-background"><option value="soft">浅</option><option value="medium" selected>标准</option><option value="solid">深</option></select></label><label>字幕位置 <select class="icp-caption-position"><option value="bottom" selected>下方</option><option value="top">上方</option></select></label></div></section>
+          <section class="icp-more" id="icp-more" aria-label="更多播放设置" hidden><div class="icp-toolgroup"><label>来源 <select class="icp-caption-source" aria-label="字幕来源"><option value="platform">平台字幕</option><option value="qwen-cache">Qwen 原版 · 录播缓存</option><option value="whisper-live">Whisper 流式（备用）</option></select></label><label class="icp-qwen-wait-setting" hidden>字幕等待上限 <select class="icp-qwen-wait" aria-label="字幕等待上限"><option value="0">不等待</option><option value="3">3 秒</option><option value="5" selected>5 秒</option><option value="10">10 秒</option><option value="15">15 秒</option></select></label><button class="icp-cache-auto" type="button" aria-pressed="true" hidden>整课缓存：开</button><button class="icp-whisper-settings" type="button">关键词与连接</button><button class="icp-whisper-retry" type="button">重新识别</button><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button></div><div class="icp-caption-options icp-voice-options" aria-label="人声增强设置"><label>降噪 <select class="icp-voice-strength" aria-label="降噪强度"><option value="light">轻度</option><option value="standard" selected>标准</option></select></label><label>音量 <select class="icp-voice-level" aria-label="自动音量"><option value="on" selected>自动稳定</option><option value="off">关闭自动稳定</option></select></label><label>音色 <select class="icp-voice-tone" aria-label="增强音色"><option value="natural" selected>自然</option><option value="clear">清晰</option></select></label><label>拖尾 <select class="icp-voice-tail" aria-label="轻度拖尾抑制"><option value="off" selected>关闭</option><option value="on">轻度（实验）</option></select></label></div><div class="icp-caption-options"><label>字幕字号 <select class="icp-caption-size"><option value="small">小</option><option value="medium" selected>标准</option><option value="large">大</option></select></label><label>字幕背景 <select class="icp-caption-background"><option value="soft">浅</option><option value="medium" selected>标准</option><option value="solid">深</option></select></label><label>字幕位置 <select class="icp-caption-position"><option value="bottom" selected>下方</option><option value="top">上方</option></select></label></div></section>
           <div class="icp-hint">空格播放/暂停 · ←/→ 快退/快进 · F 全屏 · P 画中画 · C 字幕 · 人声增强默认关闭</div>
         </main>
       </div>
@@ -91,6 +91,7 @@
   const preferredSpeed=()=>[0.75,1,1.25,1.5,1.75,2,2.5,3].includes(Number(storageGet('icp:settings:speed')))?Number(storageGet('icp:settings:speed')):1;
   $('.icp-go-live').addEventListener('click', goLive);
   $('.icp-denoise').addEventListener('click', toggleDenoise);
+  initializeVoiceSettings();
   $('.icp-caption-source').addEventListener('change', changeCaptionSource);
   const more = $('.icp-more');
   function showMore(open) {
@@ -308,6 +309,35 @@
       updateCaptionButton(); renderTranscript();
       if ($('.icp-follow').checked && !$('.icp-transcript-pane').hidden) $('.icp-transcript-list').scrollTop = $('.icp-transcript-list').scrollHeight;
     }
+  }
+
+  function applyVoiceSettings(settings) {
+    if (!settings) return;
+    $('.icp-voice-strength').value = settings.strength === 'light' ? 'light' : 'standard';
+    $('.icp-voice-level').value = settings.level === false ? 'off' : 'on';
+    $('.icp-voice-tone').value = settings.tone === 'clear' ? 'clear' : 'natural';
+    $('.icp-voice-tail').value = settings.tail === true ? 'on' : 'off';
+  }
+  let voiceSettingsQueue = Promise.resolve(), voiceSettingsRevision = 0;
+  function initializeVoiceSettings() {
+    // Run after the declarations above are initialized.
+    queueMicrotask(() => {
+      const revision = voiceSettingsRevision;
+      void voiceRequest('state').then(result => { if (revision === voiceSettingsRevision) applyVoiceSettings(result.settings); }).catch(() => {});
+    });
+    for (const control of panel.querySelectorAll('.icp-voice-options select')) control.addEventListener('change', () => {
+      const revision = ++voiceSettingsRevision;
+      const settings = { strength: $('.icp-voice-strength').value, level: $('.icp-voice-level').value === 'on',
+        tone: $('.icp-voice-tone').value, tail: $('.icp-voice-tail').value === 'on' };
+      voiceSettingsQueue = voiceSettingsQueue.catch(() => {}).then(async () => {
+        try {
+          const result = await voiceRequest('configure', { settings });
+          if (revision !== voiceSettingsRevision) return;
+          state.audio = result.active ? result : state.audio;
+          status(result.active ? (result.mode === 'rnnoise' ? '增强设置已应用；可切回原声对照。' : '已应用音色设置；降噪、自动音量与拖尾抑制暂不可用。') : '增强偏好已保存；点击工具栏 Lyue 图标启用。');
+        } catch (error) { if (revision === voiceSettingsRevision) status(error.message, true); }
+      });
+    });
   }
 
   function updateDenoiseButton() {

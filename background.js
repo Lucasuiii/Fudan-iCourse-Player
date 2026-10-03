@@ -45,7 +45,8 @@ chrome.action.onClicked.addListener((tab) => {
         url: 'offscreen.html', reasons: ['USER_MEDIA'], justification: '本地处理用户启动的课程标签页音频并回放，不录制或上传'
       });
       const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
-      const result = await audio('start', { tabId: tab.id, streamId, asr: ready.asr, clock: ready.clock, engine: ready.engine, courseId: ready.courseId });
+      const { voiceSettings } = await chrome.storage.local.get('voiceSettings');
+      const result = await audio('start', { tabId: tab.id, streamId, settings: voiceSettings, asr: ready.asr, clock: ready.clock, engine: ready.engine, courseId: ready.courseId });
       // The panel may have closed or changed lectures while capture was starting.
       const stillReady = await chrome.tabs.sendMessage(tab.id, { target: 'voice-content', type: 'ready' });
       if (!stillReady?.ready || stillReady.generation !== ready.generation) { await stopTab(tab.id); return; }
@@ -68,12 +69,24 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     return;
   }
   const tabId = sender.tab?.id ?? message.tabId;
-  if (!['state', 'toggle', 'stop', 'ended', 'asr', 'clock', 'enhancement-changed'].includes(message.type)) return;
+  if (!['state', 'toggle', 'stop', 'ended', 'asr', 'clock', 'enhancement-changed', 'configure'].includes(message.type)) return;
   const job = serialized(async () => {
     if (message.type === 'stop' || message.type === 'ended') return stopTab(tabId);
     if (message.type === 'clock' || message.type === 'asr') return audio(message.type, { tabId, clock: message.clock, enabled: Boolean(message.enabled), engine: message.engine, courseId: message.courseId });
     let state = await audio('state');
+    if (message.type === 'state' && state.tabId === null) {
+      const { voiceSettings } = await chrome.storage.local.get('voiceSettings');
+      if (voiceSettings) state = { ...state, settings: voiceSettings };
+    }
     if (message.type === 'enhancement-changed' && state.tabId === tabId) await notify(tabId, state);
+    if (message.type === 'configure') {
+      const settings = { strength: message.settings?.strength === 'light' ? 'light' : 'standard', level: message.settings?.level !== false, tone: message.settings?.tone === 'clear' ? 'clear' : 'natural', tail: message.settings?.tail === true };
+      if (state.tabId !== null && state.tabId !== tabId) throw Error('另一个标签页正在使用增强，请在那里调整设置');
+      if (state.tabId === tabId) state = await audio('configure', { tabId, settings });
+      await chrome.storage.local.set({ voiceSettings: settings });
+      if (state.tabId === tabId) await notify(tabId, state);
+      return { ...state, settings, active: state.tabId === tabId };
+    }
     if (message.type === 'toggle') {
       if (state.tabId !== tabId) throw new Error('首次启用：请点击浏览器工具栏的Lyue图标');
       try { state = await audio('toggle', { tabId }); }
