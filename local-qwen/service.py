@@ -59,6 +59,19 @@ class SpeechGate:
         return positive*512/16000 >= 0.2
 
 
+def usable_clip(clip, start, end):
+    """An imported excerpt is a local optimization, not a whole-recording override."""
+    if not clip:return None
+    path,offset,duration=clip
+    if start < offset:return None
+    if path.suffix.lower()=='.wav':
+        with wave.open(str(path),'rb') as f:
+            actual=f.getnframes()/f.getframerate()
+        duration=actual if duration is None else min(duration,actual)
+    if duration is not None and end > offset+duration+0.01:return None
+    return path,offset,duration
+
+
 class Engine(legacy.Engine):
     def __init__(self, model, aligner, vad, cache, media_dir, ffmpeg):
         import mlx.core as mx
@@ -94,11 +107,9 @@ class Engine(legacy.Engine):
         if not self.lock.acquire(timeout=120):raise RuntimeError('Qwen 正忙，请稍后重试')
         began=time.monotonic()
         try:
-            clip=self.local_clip(source)
+            clip=usable_clip(self.local_clip(source),start,min(duration,start+20))
             if clip and clip[0].suffix.lower()=='.wav':
                 cache=WindowCache(clip[0],self.cache,self.infer,self.model_id,context=prompt,offset=clip[1])
-                if clip[2] is not None and min(duration,start+20) > clip[1]+clip[2]+0.01:
-                    raise RuntimeError('当前位置超出导入的片段范围')
                 result=cache.get(start)
             else:
                 key=legacy.cache_key(source,self.model_id,prompt,start)
@@ -109,7 +120,6 @@ class Engine(legacy.Engine):
                 offset=max(0,start-2);end=min(duration,start+20);length=min(duration,end+2)-offset
                 local=clip[0] if clip else self.local_media(source)
                 if clip:
-                    if start < clip[1] or (clip[2] is not None and end>clip[1]+clip[2]):raise RuntimeError('当前位置超出导入的片段范围')
                     offset=max(offset,clip[1]);length=min(duration,end+2,clip[1]+clip[2] if clip[2] else duration)-offset
                 with tempfile.TemporaryDirectory(prefix='icourse-qwen-') as tmp:
                     wav=Path(tmp)/'audio.wav'

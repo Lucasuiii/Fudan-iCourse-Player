@@ -67,7 +67,7 @@ python3 local-qwen/compare.py \
 
 安装后在仓库根目录执行 `sh local-qwen/start-macos.sh`，保持终端运行。端口为 `127.0.0.1:8768`。第一次启动会沿用已有 Whisper 连接密钥；没有旧密钥时生成 `~/Library/Application Support/iCourseQwen/connection-key.txt`，在扩展“关键词与连接”中保存它，选择 Qwen 检查连接。
 
-模型串行处理 20 秒窗口，前后各 2 秒上下文，前瞻约 100 秒。当前窗口未就绪时临时暂停，准备好后恢复原来的播放状态；可点“取消准备”切回平台字幕。更换课程关键词会清空页面缓存并使用新的服务缓存身份；“重新载入”重新取当前与前方窗口，已有有效缓存仍会复用。服务读取有权限的课程 MP4，可复用 `local-whisper/import-recording.py` 导入的本地素材。跨域签名过期或录播访问受限会显示错误，不保证所有远程地址都可由 ffmpeg 读取。
+模型串行处理 20 秒窗口，前后各 2 秒上下文，前瞻约 100 秒。当前窗口未就绪时临时暂停，准备好后恢复原来的播放状态；可点“取消准备”切回平台字幕。更换课程关键词会清空页面缓存并使用新的服务缓存身份；“重新载入”重新取当前与前方窗口，已有有效缓存仍会复用。服务读取有权限的课程 MP4，可复用 `local-whisper/register-recording.py` 导入的本地素材。导入片段只在覆盖当前窗口时优先使用；超出片段范围时自动尝试完整本地文件或原录播地址。跨域签名过期或录播访问受限会显示错误，不保证所有远程地址都可由 ffmpeg 读取。
 
 [Silero VAD](https://github.com/snakers4/silero-vad) 使用 MIT 许可；[Qwen ForcedAligner](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B) 使用 Apache-2.0 许可。下载固定版本并检查 VAD SHA256。
 
