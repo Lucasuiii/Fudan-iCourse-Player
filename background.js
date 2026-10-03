@@ -130,7 +130,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(message?.target!=='qwen-background'||sender.id!==chrome.runtime.id)return;
   const options=sender.url===chrome.runtime.getURL('options.html')&&!sender.tab;
   if(!sender.tab&&!options)return;
-  if(!['chunk','health','cancel'].includes(message.type)||(options&&message.type!=='health'))return;
+  if(!['chunk','health','cancel','media'].includes(message.type)||(options&&message.type!=='health'))return;
   const owner=String(sender.tab?.id ?? 'options'),id=owner+':'+message.requestId;
   if(message.type==='cancel'){qwenRequests.get(id)?.abort();respond({ok:true});return;}
   const controller=new AbortController();qwenRequests.set(id,controller);
@@ -139,10 +139,10 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     const {whisperKey,whisperPrompts}=await chrome.storage.local.get(['whisperKey','whisperPrompts']);
     if(!whisperKey)throw Error('请在关键词与连接中保存本地服务密钥');
     const prompt=/^\d{1,10}$/.test(message.courseId||'')?whisperPrompts?.[message.courseId]||'':'';
-    const response=await fetch('http://127.0.0.1:8768/'+(message.type==='chunk'?'chunk':'health'),{
-      method:message.type==='chunk'?'POST':'GET',signal:controller.signal,
+    const response=await fetch('http://127.0.0.1:8768/'+(message.type==='media'?'media':message.type==='chunk'?'chunk':'health'),{
+      method:message.type==='health'?'GET':'POST',signal:controller.signal,
       headers:{Authorization:'Bearer '+whisperKey,'Content-Type':'application/json'},
-      ...(message.type==='chunk'?{body:JSON.stringify({source:message.chunk?.source,start:message.chunk?.start,duration:message.chunk?.duration,prompt})}:{})
+      ...(message.type==='media'?{body:JSON.stringify({...message.media,owner})}:message.type==='chunk'?{body:JSON.stringify({source:message.chunk?.source,start:message.chunk?.start,duration:message.chunk?.duration,prompt})}:{})
     });
     const result=await response.json();if(!response.ok)throw Error(result.error||'Qwen 服务不可用');return result;
   })().then(result=>respond({ok:true,result}),error=>respond({ok:false,error:controller.signal.aborted?'Qwen 请求已取消或超时':error.message}))
@@ -151,3 +151,9 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
 });
 chrome.tabs.onRemoved.addListener(tabId=>{for(const [id,c] of qwenRequests)if(id.startsWith(tabId+':'))c.abort();});
 chrome.tabs.onUpdated.addListener((tabId,change)=>{if(change.status==='loading')for(const [id,c] of qwenRequests)if(id.startsWith(tabId+':'))c.abort();});
+
+async function releaseQwenMedia(tabId){
+ try{const {whisperKey}=await chrome.storage.local.get('whisperKey');if(whisperKey)await fetch('http://127.0.0.1:8768/media',{method:'POST',headers:{Authorization:'Bearer '+whisperKey,'Content-Type':'application/json'},body:JSON.stringify({action:'release',owner:String(tabId)}),signal:AbortSignal.timeout(5000)});}catch{}
+}
+chrome.tabs.onRemoved.addListener(releaseQwenMedia);
+chrome.tabs.onUpdated.addListener((id,change)=>{if(change.status==='loading')void releaseQwenMedia(id);});

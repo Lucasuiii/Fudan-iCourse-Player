@@ -42,7 +42,7 @@
     onCues:cues=>{if(state.captionSource!=='qwen-cache')return;state.cues=cues;state.localCues=cues;renderTranscript();updateQwenCaption();},
     onStatus:(text,waiting)=>{if(state.captionSource==='qwen-cache'){$('.icp-subtitle-status').textContent=text;$('.icp-qwen-cancel').hidden=!waiting;}}
   });
-  $('.icp-qwen-cancel').addEventListener('click',()=>{qwen.stop();$('.icp-caption-source').value='platform';void changeCaptionSource();});
+  $('.icp-qwen-cancel').addEventListener('click',()=>{void qwenMedia({action:'release'}).catch(()=>{});qwen.stop();$('.icp-caption-source').value='platform';void changeCaptionSource();});
   const input = $('.icp-course-id');
   const list = $('.icp-list');
   const filter = $('.icp-filter');
@@ -270,6 +270,7 @@
     if (!supported || label.textContent.includes('支持 0.75')) label.textContent = streamingRateStatus();
   }
   async function changeCaptionSource() {
+    if(state.captionSource==='qwen-cache'&&$('.icp-caption-source').value!=='qwen-cache')void qwenMedia({action:'release'}).catch(()=>{});
     qwen.stop();$('.icp-qwen-cancel').hidden=true;
     streamRestart++;
     state.captionSource = $('.icp-caption-source').value;
@@ -368,6 +369,7 @@
   });
 
   function close() {
+    void qwenMedia({action:'release'}).catch(()=>{});
     qwen.stop();
     streamRestart++; showMore(false);
     state.loadToken += 1;
@@ -580,11 +582,51 @@
       }
     }
   }
+  async function qwenMedia(media){
+    const reply=await chrome.runtime.sendMessage({target:'qwen-background',type:'media',requestId:crypto.randomUUID(),media});
+    if(!reply?.ok)throw Error(reply?.error||'临时下载服务未响应');return reply.result;
+  }
+  async function downloadQwenMedia(source,signal){
+    let id,reader,finished=false;
+    try{
+      const response=await fetch(source,{credentials:'include',signal});
+      if(!response.ok)throw Error('浏览器下载失败：HTTP '+response.status+'，请重新选择课次');
+      const total=Number(response.headers.get('content-length'));
+      if(total>2*1024**3)throw Error('临时视频超过 2 GiB 上限');
+      ({id}=await qwenMedia({action:'begin',source}));
+      if(signal.aborted)throw new DOMException('已取消','AbortError');
+      reader=response.body.getReader();let offset=0;
+      while(true){
+        const {done,value}=await reader.read();if(done)break;
+        for(let at=0;at<value.length;at+=262144){
+          if(signal.aborted)throw new DOMException('已取消','AbortError');
+          const part=value.subarray(at,at+262144);let binary='';
+          for(let i=0;i<part.length;i+=8192)binary+=String.fromCharCode(...part.subarray(i,i+8192));
+          await qwenMedia({action:'append',id,offset,data:btoa(binary)});offset+=part.length;
+          $('.icp-subtitle-status').textContent='Qwen · 临时下载 '+(offset/1024**2).toFixed(1)+' MB'+(total?' / '+(total/1024**2).toFixed(1)+' MB':'')+' · 完成后开始识别';
+        }
+      }
+      if(signal.aborted)throw new DOMException('已取消','AbortError');
+      await qwenMedia({action:'finish',id});finished=true;
+    }finally{
+      if(!finished){if(reader)await reader.cancel().catch(()=>{});if(id)await qwenMedia({action:'abort',id}).catch(()=>{});}
+    }
+  }
   async function qwenRequest(chunk,signal){
     const requestId=crypto.randomUUID();
     const cancel=()=>{void chrome.runtime.sendMessage({target:'qwen-background',type:'cancel',requestId}).catch(()=>{});};
     signal.addEventListener('abort',cancel,{once:true});
-    try{if(signal.aborted)throw new DOMException('已取消','AbortError');const reply=await chrome.runtime.sendMessage({target:'qwen-background',type:'chunk',chunk,requestId,courseId:state.currentCourseId||state.courseId});if(signal.aborted)throw new DOMException('已取消','AbortError');if(!reply?.ok)throw Error(reply?.error||'Qwen 后台未响应');return reply.result;}finally{signal.removeEventListener('abort',cancel);}
+    const request=()=>chrome.runtime.sendMessage({target:'qwen-background',type:'chunk',chunk,requestId,courseId:state.currentCourseId||state.courseId});
+    try{
+      if(signal.aborted)throw new DOMException('已取消','AbortError');
+      let reply=await request();
+      if(!reply?.ok&&/读取录播失败/.test(reply?.error||'')&&!signal.aborted){
+        $('.icp-subtitle-status').textContent='Qwen · 正在通过已登录浏览器临时下载…';
+        await downloadQwenMedia(chunk.source,signal);reply=await request();
+      }
+      if(signal.aborted)throw new DOMException('已取消','AbortError');
+      if(!reply?.ok)throw Error(reply?.error||'Qwen 后台未响应');return reply.result;
+    }finally{signal.removeEventListener('abort',cancel);}
   }
   function restartQwen(){
     state.cues=[];state.localCues=[];$('.icp-local-caption').hidden=true;$('.icp-local-caption').textContent='';renderTranscript();qwen.reset(true);if(!qwen.active)qwen.start();
@@ -613,6 +655,7 @@
   }
 
   function resetVideo() {
+    void qwenMedia({action:'release'}).catch(()=>{});
     saveProgress();
     state.loadToken += 1;
     state.playController?.abort();

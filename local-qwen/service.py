@@ -6,8 +6,10 @@ import importlib.util
 import io
 import json
 import math
+import re
 from pathlib import Path
 import secrets
+import signal
 import shutil
 import subprocess
 import tempfile
@@ -16,9 +18,33 @@ import time
 import wave
 from http.server import ThreadingHTTPServer
 from window_cache import WindowCache, digest_file
+from temporary_media import TemporaryMedia
 
 spec = importlib.util.spec_from_file_location('whisper_broker', Path(__file__).parent.parent/'local-whisper/service.py')
 legacy = importlib.util.module_from_spec(spec); spec.loader.exec_module(legacy)
+
+
+def audio_read_error(stderr):
+    """Expose a useful category without logging URLs, tokens or response bodies."""
+    text=stderr.decode('utf-8',errors='replace').lower()
+    if any(s in text for s in ('certificate verify failed','certificate verification failed','unable to get local issuer','peer certificate')):
+        return '读取录播失败：TLS 证书验证失败，请检查本地 CA 配置'
+    code=re.search(r'\b(401|403|404|410)\b',text)
+    if code:return '读取录播失败：HTTP '+code[1]+'，请重新选择课次刷新播放地址'
+    if any(s in text for s in ('timed out','timeout')):return '读取录播失败：网络连接超时，请检查校园网或 VPN'
+    if any(s in text for s in ('failed to resolve','name or service not known','nodename nor servname')):return '读取录播失败：无法解析课程服务器地址'
+    if any(s in text for s in ('connection refused','network is unreachable','no route to host')):return '读取录播失败：无法连接课程服务器，请检查校园网或 VPN'
+    if any(s in text for s in ('invalid data found','moov atom not found')):return '读取录播失败：服务器没有返回可解码的 MP4 音频'
+    return '读取录播失败：音频下载或解码失败，请重新选择课次后重试'
+
+
+def remote_input_options(source):
+    host=legacy.validate_source(source).hostname
+    import certifi
+    return ['-tls_verify','1','-ca_file',certifi.where(),
+            '-user_agent','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+            '-referer','https://'+host+'/',
+            '-reconnect','1','-reconnect_on_network_error','1','-reconnect_max_retries','2','-reconnect_delay_total_max','5']
 
 
 def group_words(words, offset, start, end):
@@ -80,13 +106,17 @@ class Engine(legacy.Engine):
         self.model=Path(model);self.cache=Path(cache);self.media_dir=Path(media_dir).resolve()
         self.cache.mkdir(parents=True,exist_ok=True,mode=0o700)
         if not ffmpeg:raise RuntimeError('请先安装 ffmpeg')
-        self.ffmpeg=ffmpeg;self.lock=threading.Lock();self.last_rtf=None
+        self.ffmpeg=ffmpeg;self.lock=threading.Lock();self.last_rtf=None;self.media=TemporaryMedia()
         self.session=Session(model=str(model),dtype=mx.bfloat16)
         if any(hasattr(m,'bits') for _,m in self.session.model.named_modules()):
             raise RuntimeError('Qwen 服务要求未量化原版')
         self.aligner=ForcedAligner(model_path=str(aligner),dtype=mx.bfloat16)
         self.gate=SpeechGate(vad)
         self.model_id=':'.join(digest_file(p) for p in [Path(model)/'model.safetensors',Path(model)/'config.json',Path(model)/'tokenizer_config.json',Path(aligner)/'model.safetensors',Path(vad)])+':bf16:Chinese:512:aligned-vad-v1'
+
+    def local_media(self, source):
+        temporary=self.media.get(legacy.recording_key(source)) if hasattr(self,'media') else None
+        return temporary or super().local_media(source)
 
     def infer(self, pcm, prompt):
         import numpy as np
@@ -123,9 +153,12 @@ class Engine(legacy.Engine):
                     offset=max(offset,clip[1]);length=min(duration,end+2,clip[1]+clip[2] if clip[2] else duration)-offset
                 with tempfile.TemporaryDirectory(prefix='icourse-qwen-') as tmp:
                     wav=Path(tmp)/'audio.wav'
-                    cmd=[self.ffmpeg,'-nostdin','-v','error',*([] if local else ['-tls_verify','1']),'-rw_timeout','15000000','-protocol_whitelist','file' if local else 'https,http,tcp,tls,crypto','-ss',str(offset-(clip[1] if clip else 0)),'-i',str(local) if local else source,'-t',str(length),'-vn','-ac','1','-ar','16000','-c:a','pcm_s16le',str(wav)]
+                    cmd=[self.ffmpeg,'-nostdin','-v','error',*([] if local else remote_input_options(source)),'-rw_timeout','15000000','-protocol_whitelist','file' if local else 'https,http,tcp,tls,crypto','-ss',str(offset-(clip[1] if clip else 0)),'-i',str(local) if local else source,'-t',str(length),'-vn','-ac','1','-ar','16000','-c:a','pcm_s16le',str(wav)]
                     try:subprocess.run(cmd,check=True,capture_output=True,timeout=65)
-                    except (subprocess.CalledProcessError,subprocess.TimeoutExpired):raise RuntimeError('无法读取录播音频；可先导入有权限下载的视频或音频') from None
+                    except subprocess.CalledProcessError as error:
+                        message=audio_read_error(error.stderr or b'');print(message,flush=True)
+                        raise RuntimeError(message) from None
+                    except subprocess.TimeoutExpired:raise RuntimeError('读取录播失败：音频读取超过 65 秒，请检查校园网或 VPN') from None
                     with wave.open(str(wav),'rb') as f:
                         if f.getnframes()/16000 < length-0.1:raise RuntimeError('音频未完整覆盖当前窗口')
                         decoded=self.infer(f.readframes(f.getnframes()),prompt)
@@ -156,8 +189,27 @@ def main():
         old=Path.home()/'Library/Application Support/iCourseWhisper/connection-key.txt'
         key.write_text(old.read_text().strip() if old.exists() else secrets.token_urlsafe(32));key.chmod(0o600)
     engine=Engine(args.model,args.aligner,args.vad,args.state_dir/'aligned-cache',args.media_dir,shutil.which('ffmpeg'))
-    server=ThreadingHTTPServer(('127.0.0.1',args.port),legacy.handler(engine,key.read_text().strip(),args.port))
+    parent=legacy.handler(engine,key.read_text().strip(),args.port)
+    class Handler(parent):
+        def do_POST(self):
+            if self.path!='/media':return super().do_POST()
+            if not self.authorized():return self.send(403,{'error':'本地连接密钥无效'})
+            try:
+                size=int(self.headers.get('Content-Length','0'))
+                if not 0<size<=800000:raise ValueError('下载请求过大')
+                data=json.loads(self.rfile.read(size))
+                if not isinstance(data,dict) or not isinstance(data.get('owner'),str):raise ValueError('下载请求无效')
+                media_key=legacy.recording_key(data['source']) if data.get('action')=='begin' else None
+                self.send(200,engine.media.transfer(data,media_key))
+            except (ValueError,KeyError,TypeError):self.send(400,{'error':'临时下载无效、超过限制或已取消'})
+    server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
+    def expire():
+        while True:time.sleep(60);engine.media.cleanup()
+    threading.Thread(target=expire,daemon=True).start()
     print('Qwen BF16 缓存字幕服务就绪：127.0.0.1:'+str(args.port),flush=True)
-    server.serve_forever()
+    def terminate(*_):raise SystemExit(0)
+    signal.signal(signal.SIGTERM,terminate)
+    try:server.serve_forever()
+    finally:server.server_close();engine.media.directory.cleanup()
 
 if __name__=='__main__':main()

@@ -30,7 +30,7 @@ class ClipFallbackTests(unittest.TestCase):
             engine.infer=lambda pcm,prompt:{'text':'测试','segments':[{'text':'测试','start':2,'end':3}],'truncated':False}
             commands=[]
             def extract(cmd,**kwargs):commands.append(cmd);write_wav(Path(cmd[-1]),24)
-            with patch('service.subprocess.run',side_effect=extract):
+            with patch('service.subprocess.run',side_effect=extract), patch('service.remote_input_options',return_value=['-tls_verify','1']):
                 result=engine.chunk('https://icourse.fudan.edu.cn/test.mp4',620,1000)
             self.assertEqual(result['start'],620)
             cmd=commands[0];self.assertEqual(cmd[cmd.index('-ss')+1],'618')
