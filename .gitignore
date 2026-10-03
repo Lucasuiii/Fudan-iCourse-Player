@@ -14,5 +14,12 @@ __pycache__/
 *.mp4
 *.wav
 connection-key.txt
+*-api-key.txt
+doubao-reference*.json
 recordings.json
 local-whisper/state/
+
+# Qwen pilot models and private transcription reports
+*.safetensors
+local-qwen/state/
+pilot-results.json

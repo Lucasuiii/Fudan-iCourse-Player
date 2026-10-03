@@ -38,7 +38,7 @@ chrome.action.onClicked.addListener((tab) => {
     if (state.tabId === tab.id) { await stopTab(tab.id); return; }
     try {
       const ready = await chrome.tabs.sendMessage(tab.id, { target: 'voice-content', type: 'ready' });
-      if (!ready?.ready) throw new Error('请先在随行播放器中打开并播放一节课程');
+      if (!ready?.ready) throw new Error('请先在Lyue中打开并播放一节课程');
       if (state.tabId !== null) throw new Error('另一个标签页正在使用增强，请先在那里停止音频');
       if (!await hasOffscreen()) await chrome.offscreen.createDocument({
         url: 'offscreen.html', reasons: ['USER_MEDIA'], justification: '本地处理用户启动的课程标签页音频并回放，不录制或上传'
@@ -72,7 +72,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (message.type === 'clock' || message.type === 'asr') return audio(message.type, { tabId, clock: message.clock, enabled: Boolean(message.enabled), engine: message.engine, courseId: message.courseId });
     let state = await audio('state');
     if (message.type === 'toggle') {
-      if (state.tabId !== tabId) throw new Error('首次启用：请点击浏览器工具栏的随行播放器图标');
+      if (state.tabId !== tabId) throw new Error('首次启用：请点击浏览器工具栏的Lyue图标');
       try { state = await audio('toggle', { tabId }); }
       catch (error) { await stopTab(tabId); throw error; }
       await notify(tabId, state);
@@ -123,3 +123,37 @@ chrome.storage?.onChanged?.addListener((changes, area) => {
     target: 'voice-content', type: 'keywords-updated', courseIds, all: Boolean(changes.whisperKey)
   }).catch(() => {})))).catch(() => {});
 });
+
+// Qwen has its own loopback endpoint; credentials never go to course pages.
+const qwenRequests = new Map();
+chrome.runtime.onMessage.addListener((message,sender,respond)=>{
+  if(message?.target!=='qwen-background'||sender.id!==chrome.runtime.id)return;
+  const options=sender.url===chrome.runtime.getURL('options.html')&&!sender.tab;
+  if(!sender.tab&&!options)return;
+  if(!['chunk','cached-chunk','export-captions','relay-chunk','health','cancel','media'].includes(message.type)||(options&&message.type!=='health'))return;
+  const owner=String(sender.tab?.id ?? 'options'),id=owner+':'+message.requestId;
+  if(message.type==='cancel'){qwenRequests.get(id)?.abort();respond({ok:true});return;}
+  const controller=new AbortController();qwenRequests.set(id,controller);
+  const timeout=setTimeout(()=>controller.abort(),150000);
+  (async()=>{
+    const {whisperKey,whisperPrompts}=await chrome.storage.local.get(['whisperKey','whisperPrompts']);
+    if(!whisperKey)throw Error('请在关键词与连接中保存本地服务密钥');
+    const prompt=/^\d{1,10}$/.test(message.courseId||'')?whisperPrompts?.[message.courseId]||'':'';
+    const response=await fetch('http://127.0.0.1:8768/'+(message.type==='media'?'media':message.type==='relay-chunk'?'relay-chunk':message.type==='export-captions'?'export-captions':message.type==='cached-chunk'?'cached-chunk':message.type==='chunk'?'chunk':'health'),{
+      method:message.type==='health'?'GET':'POST',signal:controller.signal,
+      headers:{Authorization:'Bearer '+whisperKey,'Content-Type':'application/json'},
+      ...(message.type==='media'?{body:JSON.stringify({...message.media,owner})}:['chunk','cached-chunk','export-captions','relay-chunk'].includes(message.type)?{body:JSON.stringify({source:message.chunk?.source,start:message.chunk?.start,duration:message.chunk?.duration,prompt,...(message.type==='relay-chunk'?{relayId:message.relayId,owner}:['cached-chunk','export-captions'].includes(message.type)?{owner}:{})})}:{})
+    });
+    const result=await response.json();if(!response.ok)throw Error(result.error||'Qwen 服务不可用');return result;
+  })().then(result=>respond({ok:true,result}),error=>respond({ok:false,error:controller.signal.aborted?'Qwen 请求已取消或超时':error.message}))
+    .finally(()=>{clearTimeout(timeout);if(qwenRequests.get(id)===controller)qwenRequests.delete(id);});
+  return true;
+});
+chrome.tabs.onRemoved.addListener(tabId=>{for(const [id,c] of qwenRequests)if(id.startsWith(tabId+':'))c.abort();});
+chrome.tabs.onUpdated.addListener((tabId,change)=>{if(change.status==='loading')for(const [id,c] of qwenRequests)if(id.startsWith(tabId+':'))c.abort();});
+
+async function releaseQwenMedia(tabId){
+ try{const {whisperKey}=await chrome.storage.local.get('whisperKey');if(whisperKey)await fetch('http://127.0.0.1:8768/media',{method:'POST',headers:{Authorization:'Bearer '+whisperKey,'Content-Type':'application/json'},body:JSON.stringify({action:'release',owner:String(tabId)}),signal:AbortSignal.timeout(5000)});}catch{}
+}
+chrome.tabs.onRemoved.addListener(releaseQwenMedia);
+chrome.tabs.onUpdated.addListener((id,change)=>{if(change.status==='loading')void releaseQwenMedia(id);});

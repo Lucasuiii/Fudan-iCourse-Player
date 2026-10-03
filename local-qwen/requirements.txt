@@ -1,0 +1,7 @@
+# Verified on macOS / Apple M4 / Python 3.13. MLX requires Apple Silicon here.
+mlx==0.32.3
+mlx-qwen3-asr==0.4.4
+huggingface-hub==2.1.1
+onnxruntime==1.24.2
+requests==2.32.5
+certifi>=2024.7.4

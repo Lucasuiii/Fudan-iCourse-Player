@@ -19,7 +19,7 @@ $('#save').addEventListener('click', async () => {
     if (course) { if (prompt) prompts[course] = prompt; else delete prompts[course]; }
     await chrome.storage.local.set({ whisperKey: key, whisperCourseId: course, whisperPrompts: prompts });
     label.textContent = '正在检查…';
-    const reply = await chrome.runtime.sendMessage({ target: 'whisper-background', type: 'health' });
-    label.textContent = reply?.ok ? '连接成功：' + reply.result.model + '。关键词已保存，正在识别的对应课程会自动重新载入。也可回播放器点“重新识别”；已播放的内容不会自动重做，回退后可重新识别。' : (reply?.error || '后台未响应，请重新加载扩展');
+    const reply = await chrome.runtime.sendMessage({ target: $('#engine').value==='qwen'?'qwen-background':'whisper-background', type: 'health' });
+    label.textContent = reply?.ok ? '连接成功：' + reply.result.model + '。关键词已保存，正在识别的对应课程会自动重新载入。Qwen 会重新准备当前及前方窗口；Whisper 从当前位置继续识别。' : (reply?.error || '后台未响应，请重新加载扩展');
   } catch (error) { label.textContent = error.message; }
 });
