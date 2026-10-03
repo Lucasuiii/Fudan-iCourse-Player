@@ -13,7 +13,7 @@
       return {bytes,total:Number(match[3])};
     }catch(e){await reader.cancel().catch(()=>{});throw e;}
   }
-  async function open({fetcher=fetch,url,source,send,signal,onStatus=()=>{}}){
+  async function open({fetcher=fetch,url,source,send,signal,onStatus=()=>{},onPhase=()=>{}}){
     const controller=new AbortController(),abort=()=>controller.abort();signal.addEventListener('abort',abort,{once:true});
     if(signal.aborted)controller.abort();let id,failure,task,used=0;
     try{
@@ -22,7 +22,8 @@
       if(controller.signal.aborted)throw new DOMException('已取消','AbortError');
       task=(async()=>{
         while(!controller.signal.aborted){
-          const {job}=await send({action:'poll',id});
+          const {job,phase}=await send({action:'poll',id});
+          if(phase)onPhase(phase);
           if(!job){await new Promise(resolve=>{const t=setTimeout(done,80);function done(){clearTimeout(t);controller.signal.removeEventListener('abort',done);resolve();}controller.signal.addEventListener('abort',done,{once:true});if(controller.signal.aborted)done();});continue;}
           try{
             if(!Number.isSafeInteger(job.start)||!Number.isSafeInteger(job.end)||job.start<0||job.end<job.start||job.end-job.start>=262144||job.end>=first.total)throw Error('本地解码器请求了无效范围');

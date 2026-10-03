@@ -27,6 +27,16 @@ class TemporaryMediaTests(unittest.TestCase):
             self.assertFalse(m.jobs)
             m.transfer({'owner':'1','action':'release'},None);self.assertEqual(m.cache_bytes,0);self.assertFalse(m.entries)
         finally:m.close()
+    def test_phase_is_owned_and_reported_without_a_range_job(self):
+        m=TemporaryMedia()
+        try:
+            ident=m.transfer({'owner':'1','action':'begin','total':1000},'video')['id']
+            self.assertEqual(m.transfer({'owner':'1','action':'poll','id':ident},None)['phase'],'reading')
+            m.phase(ident,'2','recognizing')
+            self.assertEqual(m.transfer({'owner':'1','action':'poll','id':ident},None)['phase'],'reading')
+            m.phase(ident,'1','recognizing')
+            self.assertEqual(m.transfer({'owner':'1','action':'poll','id':ident},None)['phase'],'recognizing')
+        finally:m.close()
     def test_cancel_wakes_waiting_decoder_without_fetching_file(self):
         m=TemporaryMedia()
         try:

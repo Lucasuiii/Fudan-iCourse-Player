@@ -12,6 +12,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: npm run build:player
+      - run: git diff --exit-code -- vendor/sutro.js
+      - run: node --check sutro-player.js
       - run: node --check core.js
       - run: node --check whisper-stream.js
       - run: node --check subtitle-export.js

@@ -188,6 +188,7 @@ class Engine(legacy.Engine):
                     except subprocess.TimeoutExpired:raise RuntimeError('读取录播失败：音频读取超过 65 秒，请检查校园网或 VPN') from None
                     with wave.open(str(wav),'rb') as f:
                         if f.getnframes()/16000 < length-0.1:raise RuntimeError('音频未完整覆盖当前窗口')
+                        if relay_id:self.media.phase(relay_id,owner,'recognizing')
                         decoded=self.infer(f.readframes(f.getnframes()),prompt)
                     if decoded['truncated']:raise RuntimeError('模型输出被截断，请重试')
                     result={'start':start,'end':end,'audio_start':offset,'text':decoded['text'],'words':decoded['segments'],'cached':False}
