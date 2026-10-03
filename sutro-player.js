@@ -18,6 +18,16 @@
       stage.addEventListener('icp-settings-request',()=>onSettings());
 
     }
+    isPlaybackShortcut(event){
+      if(event.altKey||event.ctrlKey||event.metaKey||event.isComposing)return false;
+      if(![' ','spacebar','k'].includes(event.key.toLowerCase()))return false;
+      const path=event.composedPath();
+      // Keep typing and native menu/slider interactions intact, including inside shadow roots.
+      if(path.some(node=>node.isContentEditable||node.matches?.('input,textarea,select,a,summary,[role=textbox],[role=combobox],[role=slider],[role=menu],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox]')))return false;
+      // A focused Sutro button must not consume Space to repeat its last action (e.g. exit fullscreen).
+      if(path.includes(this.theme)||path.includes(this.video))return true;
+      return !path.some(node=>node.matches?.('button,[role=button]'));
+    }
     track(source){
       if(!this.tracks.has(source)){
         const labels={platform:'平台字幕','qwen-cache':'Qwen 本地识别','whisper-live':'Whisper 流式'};
