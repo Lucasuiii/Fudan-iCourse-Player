@@ -14,20 +14,9 @@
       stage.addEventListener('mediadisablesubtitlesrequest',()=>{this.enabled=false;onCaptionChange(false);},true);
       stage.addEventListener('mediashowsubtitlesrequest',()=>{this.enabled=true;onCaptionChange(true);},true);
       stage.addEventListener('mediapauserequest',onPause);
-      this.ready=Promise.resolve(root.customElements?.whenDefined('media-theme-sutro')).then(()=>{
-        const controller=theme.shadowRoot?.querySelector('media-controller');
-        if(!controller)return;
-        this.controller=controller;controller.lang='zh-CN';controller.setAttribute('nohotkeys','');controller.fullscreenElement=container;
-        const rates=controller.querySelector('media-playback-rate-menu');rates?.setAttribute('rates','0.75 1 1.25 1.5 1.75 2 2.5 3');
-        const menu=controller.querySelector('media-settings-menu');
-        if(menu){
-          for(const item of menu.querySelectorAll(':scope > media-settings-menu-item')){
-            for(const node of item.childNodes){if(node.nodeType===3){const t=node.textContent.trim();if(t==='Speed'||t==='Playback Speed')node.textContent='速度';else if(t==='Quality')node.textContent='画质';else if(t==='Captions'||t==='Subtitles/CC')node.textContent='字幕';}}
-          }
-          for(const title of menu.querySelectorAll('[slot=title]')){if(title.textContent.trim()==='Playback Speed')title.textContent='速度';else if(title.textContent.trim()==='Quality')title.textContent='画质';else if(title.textContent.trim()==='Subtitles/CC')title.textContent='字幕';}
-          const item=root.document.createElement('media-settings-menu-item');item.textContent='识别与人声增强';item.addEventListener('click',()=>{menu.hidden=true;onSettings();});menu.append(item);
-        }
-      });
+      // Chrome's isolated world has no CustomElementRegistry. UI configuration lives in MAIN.
+      stage.addEventListener('icp-settings-request',()=>onSettings());
+
     }
     track(source){
       if(!this.tracks.has(source)){
