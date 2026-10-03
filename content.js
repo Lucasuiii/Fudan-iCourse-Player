@@ -578,7 +578,7 @@
     const reply=await chrome.runtime.sendMessage({target:'qwen-background',type:'media',requestId:crypto.randomUUID(),media});
     if(!reply?.ok)throw Error(reply?.error||'分段读取服务未响应');return reply.result;
   }
-  const qwenRelaySources=new Set();
+  const qwenRead={source:null,url:null};
   async function qwenRequest(chunk,signal){
     const requestId=crypto.randomUUID();let relay;
     const cancel=()=>{void chrome.runtime.sendMessage({target:'qwen-background',type:'cancel',requestId}).catch(()=>{});};
@@ -590,17 +590,17 @@
       const saved=await request('cached-chunk');
       if(!saved?.ok)throw Error(saved?.error||'本地字幕缓存未响应');
       if(saved.result){$('.icp-subtitle-status').textContent='Qwen · 已读取本地字幕';return saved.result;}
-      $('.icp-cache-phase').textContent='读取音频 / 识别与时间戳对齐…';
-      let reply=qwenRelaySources.has(chunk.source)?null:await request('chunk');
-      if((!reply||(!reply.ok&&/读取录播失败/.test(reply.error||'')))&&!signal.aborted){
-        $('.icp-subtitle-status').textContent='Qwen · 正在准备当前窗口的分段读取…';
-        const user=await core.api(ctx,'/userapi/v1/infosimple',{}, {signal});
-        const fresh=core.signVideo(chunk.source,user.params||user.data||{});
-        relay=await QwenRange.open({url:fresh,source:chunk.source,send:qwenMedia,signal,onStatus:text=>{if(!signal.aborted){$('.icp-cache-phase').textContent=text;$('.icp-subtitle-status').textContent=text.replace('当前窗口',chunk.start<=video.currentTime&&video.currentTime<chunk.start+20?'当前窗口':'后续窗口')+' · '+qwen.completed.size+'/'+Math.ceil(chunk.duration/20);}},onPhase:phase=>{if(!signal.aborted&&phase==='recognizing')$('.icp-cache-phase').textContent='音频读取完成 · 正在识别与对齐时间戳';}});
-        qwenRelaySources.add(chunk.source);while(qwenRelaySources.size>10)qwenRelaySources.delete(qwenRelaySources.values().next().value);
-        reply=await request('relay-chunk',relay.id);
-        if(relay.error)throw relay.error;
-      }
+      $('.icp-subtitle-status').textContent='Qwen · 正在准备当前窗口的分段读取…';
+      const token=state.loadToken,courseId=state.currentCourseId||state.courseId,lectureId=state.current.id;
+      if(qwenRead.source!==chunk.source){qwenRead.source=chunk.source;qwenRead.url=chunk.source;}
+      relay=await QwenRange.open({url:qwenRead.url,refreshUrl:async refreshSignal=>{
+          const fresh=await core.refreshVideo(ctx,courseId,lectureId,chunk.source,{signal:refreshSignal});
+          if(token!==state.loadToken||refreshSignal.aborted)throw new DOMException('已取消','AbortError');
+          qwenRead.url=fresh;
+          return fresh;
+        },source:chunk.source,send:qwenMedia,signal,onStatus:text=>{if(!signal.aborted){$('.icp-cache-phase').textContent=text;$('.icp-subtitle-status').textContent=text.replace('当前窗口',chunk.start<=video.currentTime&&video.currentTime<chunk.start+20?'当前窗口':'后续窗口')+' · '+qwen.completed.size+'/'+Math.ceil(chunk.duration/20);}},onPhase:phase=>{if(!signal.aborted&&phase==='recognizing')$('.icp-cache-phase').textContent='音频读取完成 · 正在识别与对齐时间戳';}});
+      const reply=await request('relay-chunk',relay.id);
+      if(relay.error)throw relay.error;
       if(signal.aborted)throw new DOMException('已取消','AbortError');
       if(!reply?.ok)throw Error(reply?.error||'Qwen 后台未响应');return reply.result;
     }finally{if(relay)await relay.close();signal.removeEventListener('abort',cancel);}

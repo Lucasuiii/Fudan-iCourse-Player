@@ -189,10 +189,32 @@
     const tenantId = String(user.tenant_id || '');
     if (!userId || !tenantId) throw new Error('无法读取账户信息，不能验证视频地址');
     const phone = String(user.phone || '').split('').reverse().join('');
-    const hash = CryptoJS.MD5(url.pathname + userId + tenantId + phone + now).toString();
+    // WebVPN may rewrite media URLs in API responses; signatures belong to the upstream path.
+    const signingPath = url.hostname === VPN_HOST
+      ? url.pathname.replace(/^\/https?(?:-\d+)?\/77726476706e69737468656265737421[0-9a-f]+(?=\/)/i, '') : url.pathname;
+    const hash = CryptoJS.MD5(signingPath + userId + tenantId + phone + now).toString();
     url.searchParams.set('clientUUID', crypto.randomUUID());
     url.searchParams.set('t', userId + '-' + now + '-' + hash);
     return url.toString();
+  }
+
+  async function refreshVideo(ctx, courseId, lectureId, expected, options = {}) {
+    let info;
+    try { info = await api(ctx, '/courseapi/v3/portal-home-setting/get-sub-info',
+      { course_id: courseId, sub_id: lectureId }, { ...options, allowPartial: true }); }
+    catch (error) { if (options.signal?.aborted) throw error; }
+    let media = selectVideo(info || { data: {} });
+    const now = media?.now || Number(info?.data?.now || info?.data?.content?.now) || undefined;
+    if (!media) media = selectVideo(await api(ctx, '/courseapi/v3/multi-search/get-sub-detail',
+      { course_id: courseId, sub_id: lectureId }, options), { allowAnyNested: true });
+    if (!media) throw Error('课次未返回可用录播地址，请重新选择课次');
+    const target = ctx.vpn ? vpnUrl(media.url) : media.url;
+    const previous = new URL(expected), next = new URL(target);
+    if (previous.origin !== next.origin || previous.pathname !== next.pathname)
+      throw Error('课程资源已变化，请重新选择课次；已有字幕缓存保留');
+    const user = await api(ctx, '/userapi/v1/infosimple', {}, options);
+    const signed = signVideo(media.url, user.params || user.data || {}, media.now || now);
+    return ctx.vpn ? vpnUrl(signed) : signed;
   }
 
   function subtitleCues(data) {
@@ -236,5 +258,5 @@
     return (await send(type, fields)).state;
   }
 
-  root.ICourseCore = { context, vpnUrl, hlsConfig, courseIdFromUrl, api, parseCourse, hasLectureStarted, selectVideo, selectLive, probeLecture, signVideo, subtitleCues, subtitleVtt, voiceRequest };
+  root.ICourseCore = { context, vpnUrl, hlsConfig, courseIdFromUrl, api, parseCourse, hasLectureStarted, selectVideo, selectLive, probeLecture, signVideo, refreshVideo, subtitleCues, subtitleVtt, voiceRequest };
 })(globalThis);

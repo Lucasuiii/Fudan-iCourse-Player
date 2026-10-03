@@ -1,0 +1,489 @@
+[
+  {
+    "name": "backtrack to short clause comma",
+    "words": [
+      {
+        "text": "先",
+        "start": 0.0,
+        "end": 0.12
+      },
+      {
+        "text": "看",
+        "start": 0.12,
+        "end": 0.24
+      },
+      {
+        "text": "这",
+        "start": 0.24,
+        "end": 0.36
+      },
+      {
+        "text": "个",
+        "start": 0.36,
+        "end": 0.48
+      },
+      {
+        "text": "简",
+        "start": 0.48,
+        "end": 0.6
+      },
+      {
+        "text": "单",
+        "start": 0.6,
+        "end": 0.72
+      },
+      {
+        "text": "例",
+        "start": 0.72,
+        "end": 0.84
+      },
+      {
+        "text": "子",
+        "start": 0.84,
+        "end": 0.96
+      },
+      {
+        "text": "，",
+        "start": 0.96,
+        "end": 1.08
+      },
+      {
+        "text": "矩",
+        "start": 1.08,
+        "end": 1.2
+      },
+      {
+        "text": "阵",
+        "start": 1.2,
+        "end": 1.3199999999999998
+      },
+      {
+        "text": "的",
+        "start": 1.3199999999999998,
+        "end": 1.44
+      },
+      {
+        "text": "条",
+        "start": 1.44,
+        "end": 1.56
+      },
+      {
+        "text": "件",
+        "start": 1.56,
+        "end": 1.68
+      },
+      {
+        "text": "数",
+        "start": 1.68,
+        "end": 1.7999999999999998
+      },
+      {
+        "text": "会",
+        "start": 1.7999999999999998,
+        "end": 1.92
+      },
+      {
+        "text": "影",
+        "start": 1.92,
+        "end": 2.04
+      },
+      {
+        "text": "响",
+        "start": 2.04,
+        "end": 2.16
+      },
+      {
+        "text": "误",
+        "start": 2.16,
+        "end": 2.28
+      },
+      {
+        "text": "差",
+        "start": 2.28,
+        "end": 2.4
+      },
+      {
+        "text": "的",
+        "start": 2.4,
+        "end": 2.52
+      },
+      {
+        "text": "放",
+        "start": 2.52,
+        "end": 2.6399999999999997
+      },
+      {
+        "text": "大",
+        "start": 2.6399999999999997,
+        "end": 2.76
+      },
+      {
+        "text": "程",
+        "start": 2.76,
+        "end": 2.88
+      },
+      {
+        "text": "度",
+        "start": 2.88,
+        "end": 3.0
+      },
+      {
+        "text": "所",
+        "start": 3.0,
+        "end": 3.12
+      },
+      {
+        "text": "以",
+        "start": 3.12,
+        "end": 3.2399999999999998
+      },
+      {
+        "text": "需",
+        "start": 3.2399999999999998,
+        "end": 3.36
+      },
+      {
+        "text": "要",
+        "start": 3.36,
+        "end": 3.48
+      },
+      {
+        "text": "结",
+        "start": 3.48,
+        "end": 3.5999999999999996
+      },
+      {
+        "text": "合",
+        "start": 3.5999999999999996,
+        "end": 3.7199999999999998
+      },
+      {
+        "text": "残",
+        "start": 3.7199999999999998,
+        "end": 3.84
+      },
+      {
+        "text": "差",
+        "start": 3.84,
+        "end": 3.96
+      },
+      {
+        "text": "一",
+        "start": 3.96,
+        "end": 4.08
+      },
+      {
+        "text": "起",
+        "start": 4.08,
+        "end": 4.2
+      },
+      {
+        "text": "分",
+        "start": 4.2,
+        "end": 4.32
+      },
+      {
+        "text": "析",
+        "start": 4.32,
+        "end": 4.4399999999999995
+      },
+      {
+        "text": "。",
+        "start": 4.4399999999999995,
+        "end": 4.56
+      }
+    ],
+    "expected": [
+      "先看这个简单例子，",
+      "矩阵的条件数会影响误差的放大程度所以需要结合残差一起分析。"
+    ]
+  },
+  {
+    "name": "closing quote stays with sentence",
+    "words": [
+      {
+        "text": "这",
+        "start": 0.0,
+        "end": 0.12
+      },
+      {
+        "text": "个",
+        "start": 0.12,
+        "end": 0.24
+      },
+      {
+        "text": "矩",
+        "start": 0.24,
+        "end": 0.36
+      },
+      {
+        "text": "阵",
+        "start": 0.36,
+        "end": 0.48
+      },
+      {
+        "text": "叫",
+        "start": 0.48,
+        "end": 0.6
+      },
+      {
+        "text": "作",
+        "start": 0.6,
+        "end": 0.72
+      },
+      {
+        "text": "“",
+        "start": 0.72,
+        "end": 0.84
+      },
+      {
+        "text": "病",
+        "start": 0.84,
+        "end": 0.96
+      },
+      {
+        "text": "态",
+        "start": 0.96,
+        "end": 1.08
+      },
+      {
+        "text": "矩",
+        "start": 1.08,
+        "end": 1.2
+      },
+      {
+        "text": "阵",
+        "start": 1.2,
+        "end": 1.3199999999999998
+      },
+      {
+        "text": "。",
+        "start": 1.3199999999999998,
+        "end": 1.44
+      },
+      {
+        "text": "”",
+        "start": 1.44,
+        "end": 1.56
+      },
+      {
+        "text": "下",
+        "start": 1.56,
+        "end": 1.68
+      },
+      {
+        "text": "一",
+        "start": 1.68,
+        "end": 1.7999999999999998
+      },
+      {
+        "text": "步",
+        "start": 1.7999999999999998,
+        "end": 1.92
+      },
+      {
+        "text": "看",
+        "start": 1.92,
+        "end": 2.04
+      },
+      {
+        "text": "误",
+        "start": 2.04,
+        "end": 2.16
+      },
+      {
+        "text": "差",
+        "start": 2.16,
+        "end": 2.28
+      },
+      {
+        "text": "。",
+        "start": 2.28,
+        "end": 2.4
+      }
+    ],
+    "expected": [
+      "这个矩阵叫作“病态矩阵。”",
+      "下一步看误差。"
+    ]
+  },
+  {
+    "name": "identifier characters stay joined",
+    "words": [
+      {
+        "text": "矩",
+        "start": 0.0,
+        "end": 0.12
+      },
+      {
+        "text": "阵",
+        "start": 0.12,
+        "end": 0.24
+      },
+      {
+        "text": "A",
+        "start": 0.24,
+        "end": 0.36
+      },
+      {
+        "text": "1",
+        "start": 0.36,
+        "end": 0.48
+      },
+      {
+        "text": "的",
+        "start": 0.48,
+        "end": 0.6
+      },
+      {
+        "text": "条",
+        "start": 0.6,
+        "end": 0.72
+      },
+      {
+        "text": "件",
+        "start": 0.72,
+        "end": 0.84
+      },
+      {
+        "text": "数",
+        "start": 0.84,
+        "end": 0.96
+      },
+      {
+        "text": "是",
+        "start": 0.96,
+        "end": 1.08
+      },
+      {
+        "text": "3",
+        "start": 1.08,
+        "end": 1.2
+      },
+      {
+        "text": ".",
+        "start": 1.2,
+        "end": 1.3199999999999998
+      },
+      {
+        "text": "1",
+        "start": 1.3199999999999998,
+        "end": 1.44
+      },
+      {
+        "text": "4",
+        "start": 1.44,
+        "end": 1.56
+      },
+      {
+        "text": "。",
+        "start": 1.56,
+        "end": 1.68
+      }
+    ],
+    "expected": [
+      "矩阵A1的条件数是3.14。"
+    ]
+  },
+  {
+    "name": "complete English words retain spaces",
+    "words": [
+      {
+        "text": "matrix",
+        "start": 0.0,
+        "end": 0.3
+      },
+      {
+        "text": "condition",
+        "start": 0.3,
+        "end": 0.6
+      },
+      {
+        "text": "number",
+        "start": 0.6,
+        "end": 0.8999999999999999
+      },
+      {
+        "text": "。",
+        "start": 0.8999999999999999,
+        "end": 1.2
+      }
+    ],
+    "expected": [
+      "matrix condition number。"
+    ]
+  },
+  {
+    "name": "real pause separates clauses",
+    "words": [
+      {
+        "text": "先看残差",
+        "start": 0,
+        "end": 1
+      },
+      {
+        "text": "再看误差",
+        "start": 2,
+        "end": 3
+      }
+    ],
+    "expected": [
+      "先看残差",
+      "再看误差"
+    ]
+  },
+  {
+    "name": "ASCII closing quote stays with sentence",
+    "words": [
+      {
+        "text": "定义是",
+        "start": 0.0,
+        "end": 0.3
+      },
+      {
+        "text": "\"",
+        "start": 0.3,
+        "end": 0.6
+      },
+      {
+        "text": "matrix",
+        "start": 0.6,
+        "end": 0.8999999999999999
+      },
+      {
+        "text": "condition",
+        "start": 0.8999999999999999,
+        "end": 1.2
+      },
+      {
+        "text": "number",
+        "start": 1.2,
+        "end": 1.5
+      },
+      {
+        "text": "。",
+        "start": 1.5,
+        "end": 1.7999999999999998
+      },
+      {
+        "text": "\"",
+        "start": 1.7999999999999998,
+        "end": 2.1
+      },
+      {
+        "text": "下一句",
+        "start": 2.1,
+        "end": 2.4
+      },
+      {
+        "text": "。",
+        "start": 2.4,
+        "end": 2.6999999999999997
+      }
+    ],
+    "expected": [
+      "定义是\"matrix condition number。\"",
+      "下一句。"
+    ]
+  }
+]

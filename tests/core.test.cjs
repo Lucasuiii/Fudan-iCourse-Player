@@ -109,3 +109,26 @@ test('future lectures are hidden using campus timezone and explicit start times'
   assert.equal(c.hasLectureStarted({ date: '2026-09-30', title: '2026-09-30第6-8节' }, now), true);
   assert.equal(c.hasLectureStarted({ date: '2026-10-01' }, new Date('2026-09-30T16:00:00Z')), true);
 });
+test('refresh uses server clock and signs original media path before WebVPN conversion',async()=>{
+ for(const vpn of [false,true]){
+  const c=core(async(url,options)=>{assert.equal(options.credentials,'include');return{ok:true,json:async()=>String(url).includes('infosimple')?{code:0,params:{id:'101',tenant_id:'222',phone:'000'}}:{code:0,data:{now:1234567890,video_list:{one:{preview_url:'https://icourse.fudan.edu.cn/media/a.mp4'}}}}};});
+  const raw='https://icourse.fudan.edu.cn/media/a.mp4',user={id:'101',tenant_id:'222',phone:'000'};
+  const original=vpn?c.vpnUrl(raw):raw;
+  const result=await c.refreshVideo({...ctx,vpn},'11','22',original);
+  const correct=c.signVideo(raw,user,1234567890);
+  assert.equal(new URL(result).searchParams.get('t'),new URL(correct).searchParams.get('t'));
+  assert.equal(new URL(result).pathname,new URL(original).pathname);
+ }
+});
+test('refresh rejects changed media before authorizing it for old caption cache',async()=>{
+ const c=core(async()=>({ok:true,json:async()=>({code:0,data:{video_list:{one:{preview_url:'https://icourse.fudan.edu.cn/different.mp4'}}}})}));
+ await assert.rejects(c.refreshVideo(ctx,'11','22','https://icourse.fudan.edu.cn/a.mp4'),/资源已变化/);
+});
+test('already-rewritten WebVPN media URLs have the same signature as upstream URLs',()=>{
+ const c=core(),user={id:'101',tenant_id:'222',phone:'000'},raw='https://icourse.fudan.edu.cn/media/a.mp4?other=keep';
+ const playing=c.vpnUrl(c.signVideo(raw,user,1234567890));
+ const resigned=c.signVideo(playing,user,1234567890);
+ assert.equal(new URL(resigned).searchParams.get('t'),new URL(playing).searchParams.get('t'));
+ assert.equal(new URL(resigned).pathname,new URL(playing).pathname);
+ assert.equal(new URL(resigned).searchParams.get('other'),'keep');
+});

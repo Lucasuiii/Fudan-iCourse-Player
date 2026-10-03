@@ -57,26 +57,61 @@ def owned_words(words, offset, start, end):
     return sorted(selected,key=lambda w:w['start'])
 
 
+def caption_text(words):
+    text=''
+    previous=''
+    for w in words:
+        current=w['text']
+        # Whole English words need spaces; aligned character fragments do not.
+        space=' ' if (re.search(r'[A-Za-z0-9]$',previous) and re.match(r'[A-Za-z0-9]',current)
+            and (len(previous)>1 or len(current)>1)) else ''
+        text+=space+current
+        previous=current
+    return text
+
+
 def group_words(words, offset, start, end):
-    """Prefer punctuation and pauses; length is a safety limit, not a fixed cut."""
-    cues=[]
+    """Backtrack to a natural boundary before enforcing readability limits."""
     selected=owned_words(words,offset,start,end)
-    for i,w in enumerate(selected):
-        upcoming=''.join(x['text'] for x in selected[i:i+6])
-        prev=cues[-1] if cues else None
-        boundary=prev and (re.search(r'[。！？!?；;]$',prev['text']) or
-            w['start']-prev['end']>0.6 or
-            (len(prev['text'])>=12 and (re.search(r'[，,：:]$',prev['text']) or w['start']-prev['end']>0.35 or re.match(r'但是|所以|然后|不过|因此|接下来|另外|也就是说',upcoming))) or
-            len(prev['text'])+len(w['text'])>36 or w['end']-prev['start']>8)
-        if not prev or boundary:cues.append(dict(w))
-        else:
-            space=' ' if re.search(r'[A-Za-z0-9]$',prev['text']) and re.match(r'[A-Za-z0-9]',w['text']) else ''
-            prev['text']+=space+w['text'];prev['end']=max(prev['end'],w['end'])
+    cues=[]
+    pending=[]
+    strong=r'[。！？!?；;][”’」』）)"]*$'
+    punctuation=r'^[，。！？、：；,.!?;:）)”’」』"]'
+    def emit(count):
+        nonlocal pending
+        part=pending[:count]
+        cues.append({'start':part[0]['start'],'end':max(w['end'] for w in part),'text':caption_text(part)})
+        pending=pending[count:]
+    def natural_cut():
+        best=None
+        for i in range(1,len(pending)):
+            before=caption_text(pending[:i])
+            after=caption_text(pending[i:])
+            if len(before)<8 or len(after)<6 or re.match(punctuation,after):continue
+            gap=pending[i]['start']-pending[i-1]['end']
+            score=60 if re.search(r'[，,：:]$',before) else 35 if gap>=0.18 else 0
+            if not score and re.match(r'但是|所以|然后|不过|因此|接下来|另外|也就是说',after):score=25
+            if score:
+                score-=abs(len(before)-24)*0.4
+                if best is None or score>best[0]:best=(score,i)
+        return best[1] if best else len(pending)
+    for w in selected:
+        if pending and not re.match(punctuation,w['text']):
+            text=caption_text(pending)
+            gap=w['start']-max(x['end'] for x in pending)
+            if re.search(strong,text) or gap>0.6 or (len(text)>=12 and
+                (re.search(r'[，,：:]$',text) or gap>0.35)):
+                emit(len(pending))
+            elif len(caption_text(pending+[w]))>36 or w['end']-pending[0]['start']>8:
+                emit(natural_cut())
+                # A remaining clause can itself exceed the safety limit.
+                if pending and (len(caption_text(pending+[w]))>36 or w['end']-pending[0]['start']>8):emit(len(pending))
+        pending.append(w)
+    if pending:emit(len(pending))
     if len(cues)>1:
         prev,last=cues[-2:]
-        if len(last['text'])<6 and len(prev['text'])+len(last['text'])<=40 and last['end']-prev['start']<=9 and last['start']-prev['end']<=0.35 and not re.search(r'[。！？!?；;]$',prev['text']):
-            space=' ' if re.search(r'[A-Za-z0-9]$',prev['text']) and re.match(r'[A-Za-z0-9]',last['text']) else ''
-            prev['text']+=space+last['text'];prev['end']=last['end'];cues.pop()
+        if len(last['text'])<6 and len(prev['text'])+len(last['text'])<=40 and last['end']-prev['start']<=9 and last['start']-prev['end']<=0.35 and not re.search(strong,prev['text']):
+            prev['text']=caption_text([prev,last]);prev['end']=max(prev['end'],last['end']);cues.pop()
     return cues
 
 

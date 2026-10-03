@@ -12,3 +12,14 @@ class AlignmentTests(unittest.TestCase):
         self.assertEqual(len(group_words(words,0,0,20)),2)
 
 if __name__=='__main__':unittest.main()
+
+class NaturalCaptionTests(unittest.TestCase):
+    def test_shared_readability_examples_and_word_preservation(self):
+        import json
+        from pathlib import Path
+        cases=json.loads((Path(__file__).resolve().parent.parent/'tests/fixtures/caption-layout.json').read_text())
+        for sample in cases:
+            with self.subTest(sample['name']):
+                cues=group_words(sample['words'],0,0,20)
+                self.assertEqual([c['text'] for c in cues],sample['expected'])
+                self.assertTrue(all(0<=c['start']<c['end']<=20 for c in cues))
