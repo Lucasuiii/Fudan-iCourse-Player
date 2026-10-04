@@ -706,7 +706,7 @@
   }
 
   function resetVideo() {
-    qwenRelaySources.clear();void qwenMedia({action:'release'}).catch(()=>{});
+    void qwenMedia({action:'release'}).catch(()=>{});
     saveProgress();
     state.loadToken += 1;
     state.playController?.abort();
