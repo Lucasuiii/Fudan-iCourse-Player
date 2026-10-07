@@ -7,30 +7,9 @@ function app(prompts={'11':'QR 分解'},fetchImpl){
  const event={addListener(){}};
  const chrome={runtime:{id:'own',getURL:p=>'chrome-extension://own/'+p,onMessage:{addListener:f=>listeners.push(f)}},tabs:{onRemoved:event,onUpdated:event},action:{onClicked:event},storage:{local:{get:async()=>({whisperKey:'private',whisperPrompts:prompts})}}};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../course-terms.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../background.js'),'utf8'),{chrome,AbortSignal,AbortController,setTimeout,clearTimeout,fetch:fetchImpl||(async(url,init)=>{calls.push({url,init});return {ok:true,json:async()=>({cues:[]})};})});
- const send=(message,sender={id:'own',tab:{id:1}})=>new Promise(resolve=>{let waiting=false;for(const f of listeners)waiting=f({target:'whisper-background',courseId:'11',...message},sender,resolve)===true||waiting;if(!waiting)resolve(null);});
+ const send=(message,sender={id:'own',tab:{id:1}})=>new Promise(resolve=>{let waiting=false;for(const f of listeners)waiting=f({target:'qwen-background',courseId:'11',...message},sender,resolve)===true||waiting;if(!waiting)resolve(null);});
  return {send,calls,chrome};
 }
-test('Whisper credentials stay in background and requests use fixed loopback address',async()=>{
- const a=app();const reply=await a.send({type:'chunk',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:20,duration:100}});
- assert.equal(reply.ok,true);assert.equal(a.calls[0].url,'http://127.0.0.1:8766/chunk');assert.equal(a.calls[0].init.headers.Authorization,'Bearer private');assert.equal(JSON.parse(a.calls[0].init.body).prompt,'QR 分解');assert.equal(JSON.stringify(reply).includes('private'),false);
-});
-test('foreign senders and offscreen cannot request inference, missing key is actionable',async()=>{
- const a=app();assert.equal(await a.send({type:'chunk'},{id:'foreign',tab:{id:1}}),null);assert.equal(await a.send({type:'chunk'},{id:'own',url:'chrome-extension://own/offscreen.html'}),null);assert.equal(a.calls.length,0);
- a.chrome.storage.local.get=async()=>({});assert.match((await a.send({type:'health'})).error,/连接密钥/);
-});
-
-test('optional course glossary never affects another course or trusts caller prompts',async()=>{
- const a=app();await a.send({type:'chunk',courseId:'22',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:20,duration:100,prompt:'无关的术语'}});
- assert.deepEqual(JSON.parse(a.calls[0].init.body),{source:'https://icourse.fudan.edu.cn/a.mp4',start:20,duration:100});
-});
-test('PCM inference accepts only the extension offscreen owner with active capture',async()=>{
- const a=app();assert.equal(await a.send({type:'stream',samples:[0]}),null);
- a.chrome.runtime.getContexts=async()=>[{}];a.chrome.runtime.sendMessage=async()=>({ok:true,state:{tabId:1}});
- const reply=await a.send({type:'stream',samples:[0]},{id:'own',url:'chrome-extension://own/offscreen.html'});
- assert.equal(reply.ok,true);assert.equal(a.calls[0].url,'http://127.0.0.1:8766/stream');
- a.chrome.runtime.sendMessage=async()=>({ok:true,state:{tabId:null}});
- assert.match((await a.send({type:'stream',samples:[0]},{id:'own',url:'chrome-extension://own/offscreen.html'})).error,/停止/);
-});
 test('saved terms notify matching-course players without exposing key or prompt',async()=>{
  let changed;const notices=[];const event={addListener(){}};
  const chrome={runtime:{id:'own',getURL:p=>'chrome-extension://own/'+p,onMessage:event},tabs:{onRemoved:event,onUpdated:event,query:async()=>[{id:1}],sendMessage:async(id,m)=>notices.push(m)},action:{onClicked:event},storage:{onChanged:{addListener:f=>changed=f}}};
@@ -59,19 +38,16 @@ test('Qwen cache lookup uses trusted glossary and owner, and options pages canno
  assert.equal(await a.send(message,{id:'own',url:'chrome-extension://own/options.html'}),null);
 });
 
-test('Qwen inference, cache lookup, export and Whisper use only the saved course context',async()=>{
+test('Qwen inference, cache lookup, export use only the saved course context',async()=>{
  const a=app({'38146':'ε epsilon，QR 分解'});
  for(const type of ['chunk','cached-chunk','export-captions'])assert.equal((await a.send({target:'qwen-background',type,courseId:'38146',requestId:type,chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100,prompt:'caller spoof'}})).ok,true);
- assert.equal((await a.send({type:'chunk',courseId:'38146',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100}})).ok,true);
  const prompts=a.calls.map(c=>JSON.parse(c.init.body).prompt);
  assert.equal(new Set(prompts).size,1);assert.equal(prompts[0],'ε epsilon，QR 分解');assert.equal(prompts[0].includes('caller spoof'),false);
 });
 test('numerical course inference has no implicit glossary when its settings are empty',async()=>{
  const a=app();
  await a.send({target:'qwen-background',type:'chunk',courseId:'38146',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100}});
- await a.send({type:'chunk',courseId:'38146',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100}});
  assert.equal(JSON.parse(a.calls[0].init.body).prompt,'');
- assert.equal(Object.hasOwn(JSON.parse(a.calls[1].init.body),'prompt'),false);
 });
 
 test('Qwen loopback connection failure is explicit without claiming a confirmed shutdown',async()=>{
@@ -83,4 +59,17 @@ test('Qwen service HTTP errors preserve the service reason instead of becoming c
  const a=app({},async()=>({ok:false,status:503,json:async()=>({error:'音频未完整覆盖当前窗口'})}));
  const reply=await a.send({target:'qwen-background',type:'relay-chunk',requestId:'short',chunk:{source:'clip',start:0,duration:20}});
  assert.equal(reply.error,'音频未完整覆盖当前窗口');
+});
+
+test('settings opens Qwen connection page without fetching or exposing credentials',async()=>{
+ const a=app();let opened=0,saved;
+ a.chrome.runtime.openOptionsPage=async()=>opened++;
+ a.chrome.storage.local.set=async values=>saved=values;
+ assert.equal((await a.send({type:'settings',courseId:'38146'})).ok,true);
+ assert.equal(opened,1);assert.equal(saved.whisperCourseId,'38146');assert.equal(a.calls.length,0);
+});
+test('retired Whisper and ASR endpoints are not accepted',async()=>{
+ const a=app();assert.equal(await a.send({target:'whisper-background',type:'health'}),null);
+ assert.equal(await a.send({target:'voice-background',type:'asr',enabled:true}),null);
+ assert.equal(a.calls.length,0);
 });

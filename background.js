@@ -9,15 +9,9 @@ function serialized(task) {
 async function hasOffscreen() {
   return (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'], documentUrls: [chrome.runtime.getURL('offscreen.html')] })).length > 0;
 }
-async function whisperConfig(courseId) {
-  const { whisperKey, whisperPrompts } = await chrome.storage.local.get(['whisperKey', 'whisperPrompts']);
-  if (!whisperKey) throw Error('请在“关键词与连接”保存本地服务密钥');
-  return { key: whisperKey, prompt: ICourseTerms.resolve(courseId,whisperPrompts) };
-}
 async function audio(type, fields = {}) {
   if (!await hasOffscreen()) return { tabId: null, enabled: false };
-  const config = ((type === 'start' && fields.asr) || (type === 'asr' && fields.enabled)) ? await whisperConfig(fields.courseId) : undefined;
-  const reply = await chrome.runtime.sendMessage({ target: 'voice-offscreen', type, ...fields, ...(config ? { config } : {}) });
+  const reply = await chrome.runtime.sendMessage({ target: 'voice-offscreen', type, ...fields });
   if (!reply?.ok) throw new Error(reply?.error || '音频页面没有响应');
   return reply.state;
 }
@@ -46,7 +40,7 @@ chrome.action.onClicked.addListener((tab) => {
       });
       const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
       const { voiceSettings } = await chrome.storage.local.get('voiceSettings');
-      const result = await audio('start', { tabId: tab.id, streamId, settings: voiceSettings, asr: ready.asr, clock: ready.clock, engine: ready.engine, courseId: ready.courseId });
+      const result = await audio('start', { tabId: tab.id, streamId, settings: voiceSettings });
       // The panel may have closed or changed lectures while capture was starting.
       const stillReady = await chrome.tabs.sendMessage(tab.id, { target: 'voice-content', type: 'ready' });
       if (!stillReady?.ready || stillReady.generation !== ready.generation) { await stopTab(tab.id); return; }
@@ -62,17 +56,12 @@ chrome.action.onClicked.addListener((tab) => {
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message?.target !== 'voice-background' || sender.id !== chrome.runtime.id) return;
   const fromOffscreen = sender.url === chrome.runtime.getURL('offscreen.html') && !sender.tab;
-  if (!sender.tab && !(fromOffscreen && ['ended', 'asr-event', 'enhancement-changed'].includes(message.type))) return;
+  if (!sender.tab && !(fromOffscreen && ['ended', 'enhancement-changed'].includes(message.type))) return;
   if (message.type === 'enhancement-changed' && !fromOffscreen) return;
-  if (message.type === 'asr-event' && fromOffscreen) {
-    void chrome.tabs.sendMessage(message.tabId, { target: 'voice-content', event: message.event }).catch(() => {});
-    return;
-  }
   const tabId = sender.tab?.id ?? message.tabId;
-  if (!['state', 'toggle', 'stop', 'ended', 'asr', 'clock', 'enhancement-changed', 'configure'].includes(message.type)) return;
+  if (!['state', 'toggle', 'stop', 'ended', 'enhancement-changed', 'configure'].includes(message.type)) return;
   const job = serialized(async () => {
     if (message.type === 'stop' || message.type === 'ended') return stopTab(tabId);
-    if (message.type === 'clock' || message.type === 'asr') return audio(message.type, { tabId, clock: message.clock, enabled: Boolean(message.enabled), engine: message.engine, courseId: message.courseId });
     let state = await audio('state');
     if (message.type === 'state' && state.tabId === null) {
       const { voiceSettings } = await chrome.storage.local.get('voiceSettings');
@@ -95,7 +84,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     }
     return { ...state, active: state.tabId === tabId };
   });
-  job.then((state) => respond({ ok: true, asrProtocol: 1, state }), (error) => respond({ ok: false, error: error.message }));
+  job.then((state) => respond({ ok: true, state }), (error) => respond({ ok: false, error: error.message }));
   return true;
 });
 chrome.tabs.onRemoved.addListener((tabId) => { void serialized(() => stopTab(tabId)).catch(() => {}); });
@@ -103,33 +92,7 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
   if (change.status === 'loading') void serialized(() => stopTab(tabId)).catch(() => {});
 });
 
-// Separate queue: model inference must never block voice cleanup or tab capture.
-chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message?.target !== 'whisper-background' || sender.id !== chrome.runtime.id) return;
-  const streaming = sender.url === chrome.runtime.getURL('offscreen.html') && !sender.tab;
-  const options = sender.url === chrome.runtime.getURL('options.html') && !sender.tab;
-  if (!sender.tab && !options && !streaming) return;
-  if (!['chunk', 'stream', 'health', 'settings'].includes(message.type) || (options && !['health','settings'].includes(message.type)) || (streaming && !['health','stream'].includes(message.type)) || (message.type === 'stream' && !streaming)) return;
-  const job = (async () => {
-    if (streaming && message.type === 'stream' && (await audio('state')).tabId === null) throw Error('音频捕获已停止');
-    if (message.type === 'settings') { if (/^\d{1,10}$/.test(message.courseId || '')) await chrome.storage.local.set({ whisperCourseId: message.courseId }); await chrome.runtime.openOptionsPage(); return {}; }
-    const { whisperKey, whisperPrompts } = await chrome.storage.local.get(['whisperKey', 'whisperPrompts']);
-    const whisperPrompt = ICourseTerms.resolve(message.courseId,whisperPrompts);
-    if (!whisperKey) throw Error('请先点“Whisper 设置”，填写本地服务连接密钥');
-    const response = await fetch('http://127.0.0.1:8766/' + (message.type === 'chunk' ? 'chunk' : message.type === 'stream' ? 'stream' : 'health'), {
-      method: message.type === 'health' ? 'GET' : 'POST',
-      headers: { Authorization: 'Bearer ' + whisperKey, 'Content-Type': 'application/json' },
-      ...(message.type === 'stream' ? {body: JSON.stringify({samples:message.samples, ...(whisperPrompt ? {prompt:whisperPrompt} : {})})} : message.type === 'chunk' ? { body: JSON.stringify({ source: message.chunk?.source, start: message.chunk?.start, duration: message.chunk?.duration, ...(whisperPrompt ? { prompt: whisperPrompt } : {}) }) } : {}),
-      signal: AbortSignal.timeout(180000)
-    }).catch(() => { throw Error('无法连接本地 Whisper 服务，请确认服务正在运行'); });
-    const result = await response.json();
-    if (!response.ok) throw Error(result.error || '本地识别失败');
-    return result;
-  })();
-  job.then(result => respond({ ok: true, result }), error => respond({ ok: false, error: error.message }));
-  return true;
-});
-
+// Retain legacy storage names so existing Qwen keys and terms remain usable.
 // Apply saved course terms to already-open players; no secret is sent to pages.
 chrome.storage?.onChanged?.addListener((changes, area) => {
   if (area !== 'local' || (!changes.whisperPrompts && !changes.whisperKey)) return;
@@ -146,9 +109,10 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(message?.target!=='qwen-background'||sender.id!==chrome.runtime.id)return;
   const options=sender.url===chrome.runtime.getURL('options.html')&&!sender.tab;
   if(!sender.tab&&!options)return;
-  if(!['chunk','cached-chunk','export-captions','relay-chunk','health','cancel','media'].includes(message.type)||(options&&message.type!=='health'))return;
+  if(!['chunk','cached-chunk','export-captions','relay-chunk','health','settings','cancel','media'].includes(message.type)||(options&&!['health','settings'].includes(message.type)))return;
   const owner=String(sender.tab?.id ?? 'options'),id=owner+':'+message.requestId;
   if(message.type==='cancel'){qwenRequests.get(id)?.abort();respond({ok:true});return;}
+  if(message.type==='settings'){void (async()=>{if(/^\d{1,10}$/.test(message.courseId||''))await chrome.storage.local.set({whisperCourseId:message.courseId});await chrome.runtime.openOptionsPage();})().then(()=>respond({ok:true,result:{}}),error=>respond({ok:false,error:error.message}));return true;}
   const controller=new AbortController();qwenRequests.set(id,controller);
   const timeout=setTimeout(()=>controller.abort(),150000);
   (async()=>{

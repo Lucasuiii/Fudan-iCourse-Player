@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lyue",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "在已登录的复旦 iCourse 页面中自动查找直播与录播，提供字幕和可选降噪。",
   "content_scripts": [
     {
@@ -59,12 +59,11 @@
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "host_permissions": [
-    "http://127.0.0.1:8766/*",
     "http://127.0.0.1:8768/*"
   ],
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
   },
-  "version_name": "Lyue 1.3.2"
+  "version_name": "Lyue 1.3.3"
 }

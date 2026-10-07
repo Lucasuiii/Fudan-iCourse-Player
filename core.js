@@ -250,11 +250,6 @@
       if (!reply.ok) throw new Error(reply.error || '音频扩展操作失败');
       return reply;
     };
-    // A refreshed page can run newer code while Chrome still has the old worker.
-    if (type === 'asr' && fields.enabled) {
-      const capability = await send('state');
-      if (capability.asrProtocol !== 1) throw new Error('扩展后台不支持本地识别或尚未完成更新；' + reload);
-    }
     return (await send(type, fields)).state;
   }
 

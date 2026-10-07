@@ -30,7 +30,7 @@
     }
     track(source){
       if(!this.tracks.has(source)){
-        const labels={platform:'平台字幕','qwen-cache':'Qwen 本地识别','whisper-live':'Whisper 流式'};
+        const labels={platform:'平台字幕','qwen-cache':'Qwen 本地识别'};
         const track=this.video.addTextTrack('subtitles',labels[source]||'本地字幕','zh');track.mode='disabled';this.tracks.set(source,track);this.cueLists.set(source,[]);
       }
       return this.tracks.get(source);

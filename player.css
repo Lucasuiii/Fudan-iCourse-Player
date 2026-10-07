@@ -181,8 +181,6 @@
   #icp-panel .icp-local-caption{bottom:46px;padding:4px 8px;line-height:1.35}
   #icp-panel .icp-caption-options{gap:10px}
 }
-#icp-panel .icp-whisper-cancel{flex:none;padding:5px 10px;border:1px solid var(--icp-line);border-radius:999px;background:var(--icp-control);color:var(--icp-accent);font-size:11px}
-#icp-panel .icp-whisper-cancel[hidden]{display:none}
 @media(min-width:821px){
   #icp-panel .icp-tools{position:sticky;bottom:0;z-index:6;padding:10px;border:1px solid var(--icp-line);border-radius:16px;background:var(--icp-surface-strong);box-shadow:0 4px 20px #0000000c}
 }

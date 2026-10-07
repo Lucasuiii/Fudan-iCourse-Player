@@ -20,8 +20,7 @@ from http.server import ThreadingHTTPServer
 from window_cache import WindowCache, digest_file
 from temporary_media import TemporaryMedia
 
-spec = importlib.util.spec_from_file_location('whisper_broker', Path(__file__).parent.parent/'local-whisper/service.py')
-legacy = importlib.util.module_from_spec(spec); spec.loader.exec_module(legacy)
+import recording as legacy
 
 
 def audio_read_error(stderr):
@@ -146,7 +145,7 @@ def usable_clip(clip, start, end):
     return path,offset,duration
 
 
-class Engine(legacy.Engine):
+class Engine(legacy.RecordingMedia):
     def __init__(self, model, aligner, vad, cache, media_dir, ffmpeg):
         import mlx.core as mx
         from mlx_qwen3_asr import Session
@@ -168,8 +167,6 @@ class Engine(legacy.Engine):
         if not self.gate.speech(audio):return {'text':'','segments':[],'truncated':False}
         result=self.session.transcribe((audio,16000),language='Chinese',context=prompt,max_new_tokens=512,return_timestamps=True,forced_aligner=self.aligner)
         return {'text':result.text,'segments':result.segments or [],'truncated':result.truncated}
-
-    def stream(self, *_):raise RuntimeError('Qwen 缓存模式只支持录播，请选择 Qwen 录播缓存')
 
     def cached_chunk(self, source, start, duration, prompt=''):
         legacy.validate_source(source)
@@ -246,7 +243,7 @@ def main():
     p.add_argument('--model',type=Path,default=base/'models/qwen3-asr-1.7b-bf16')
     p.add_argument('--aligner',type=Path,default=base/'models/qwen3-forced-aligner-0.6b')
     p.add_argument('--vad',type=Path,default=base/'models/silero-vad.onnx')
-    p.add_argument('--media-dir',type=Path,default=Path.home()/'Library/Application Support/iCourseWhisper/media')
+    p.add_argument('--media-dir',type=Path,default=base/'media')
     p.add_argument('--port',type=int,default=8768)
     args=p.parse_args();args.state_dir.mkdir(parents=True,exist_ok=True,mode=0o700)
     key=args.state_dir/'connection-key.txt'
