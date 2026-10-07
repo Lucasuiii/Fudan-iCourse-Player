@@ -281,3 +281,10 @@
 #icp-panel .icp-main:fullscreen .icp-tools{padding:3px 12px;min-height:28px;background:#101820;color:#dae3ef}
 #icp-panel .icp-main:fullscreen .icp-tools>button,#icp-panel .icp-main:fullscreen .icp-cache-count{color:#c5d2e4}
 @media(max-width:820px){#icp-panel .icp-stage{flex:none;aspect-ratio:16/9;min-height:0}}
+
+/* Subtitle preparation is visible below the picture, including in fullscreen. */
+#icp-panel .icp-tools{flex-wrap:wrap}
+#icp-panel .icp-qwen-state{flex:1 1 280px;min-width:0;font-size:11px;line-height:1.6;color:var(--icp-muted);overflow-wrap:anywhere}
+#icp-panel .icp-qwen-state[data-failed="true"]{color:var(--icp-error);font-size:12px}
+#icp-panel .icp-main:fullscreen .icp-qwen-state{color:#c5d2e4}
+#icp-panel .icp-main:fullscreen .icp-qwen-state[data-failed="true"]{color:#ffb4a7}

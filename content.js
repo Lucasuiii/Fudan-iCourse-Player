@@ -26,7 +26,7 @@
         <aside class="icp-sidebar" id="icp-sidebar"><div class="icp-course"><small>当前课程</small><strong class="icp-course-title">尚未选择课程</strong><span class="icp-teacher"></span><span class="icp-resource-status" role="status"></span><button class="icp-probe-retry" type="button" hidden>重新检查资源</button></div><div class="icp-tabs" role="tablist" aria-label="侧栏"><button class="icp-tab icp-tab-active" type="button" id="icp-tab-lectures" data-tab="lectures" role="tab" aria-controls="icp-pane-lectures" aria-selected="true">课次</button><button class="icp-tab" type="button" id="icp-tab-transcript" data-tab="transcript" role="tab" aria-controls="icp-pane-transcript" tabindex="-1" aria-selected="false">逐句字幕</button></div><div class="icp-lectures-pane" id="icp-pane-lectures" role="tabpanel" aria-labelledby="icp-tab-lectures"><input class="icp-filter" type="search" placeholder="搜索课次" aria-label="搜索课次"><div class="icp-list" aria-label="课次列表"></div></div><div class="icp-transcript-pane" id="icp-pane-transcript" role="tabpanel" aria-labelledby="icp-tab-transcript" hidden><div class="icp-transcript-controls"><input class="icp-transcript-filter" type="search" placeholder="搜索字幕关键词" aria-label="搜索字幕"><div class="icp-export-controls"><select class="icp-export-format" aria-label="字幕导出格式"><option value="srt">SRT</option><option value="vtt">VTT</option></select><button class="icp-export" type="button">导出本课字幕</button></div><label class="icp-follow-label"><input class="icp-follow" type="checkbox" checked> 跟随播放</label></div><p class="icp-transcript-empty">选择课次后读取官方字幕</p><div class="icp-transcript-list"></div></div></aside>
         <main class="icp-main"><div class="icp-stage"><media-theme-sutro class="icp-theme"><video class="icp-video" slot="media" controls playsinline preload="metadata"></video></media-theme-sutro><div class="icp-local-caption" hidden></div><div class="icp-placeholder"><span>▶</span><strong>选择一节课次，开始观看</strong><small>你的课程 · 更舒服的播放体验</small></div></div>
           <div class="icp-now"><div><small>当前课次</small><strong class="icp-now-title">等待选择课次</strong></div><span class="icp-date"></span></div>
-          <div class="icp-tools"><button class="icp-go-live" type="button" hidden>● 回到直播</button><button class="icp-more-toggle" type="button" aria-expanded="false" aria-controls="icp-more">识别与增强</button><details class="icp-cache-progress" hidden><summary class="icp-cache-count">字幕缓存 0/0</summary><div class="icp-cache-detail"><div class="icp-cache-window"></div><progress class="icp-cache-meter" max="1" value="0" aria-label="整课字幕缓存进度"></progress><div class="icp-cache-map" role="img" aria-label="字幕缓存时间分布"></div><small class="icp-cache-phase" role="status"></small></div></details></div>
+          <div class="icp-tools"><span class="icp-qwen-state" role="status" hidden></span><button class="icp-go-live" type="button" hidden>● 回到直播</button><button class="icp-more-toggle" type="button" aria-expanded="false" aria-controls="icp-more">识别与增强</button><details class="icp-cache-progress" hidden><summary class="icp-cache-count">字幕缓存 0/0</summary><div class="icp-cache-detail"><div class="icp-cache-window"></div><progress class="icp-cache-meter" max="1" value="0" aria-label="整课字幕缓存进度"></progress><div class="icp-cache-map" role="img" aria-label="字幕缓存时间分布"></div><small class="icp-cache-phase" role="status"></small></div></details></div>
           <section class="icp-more" id="icp-more" aria-label="更多播放设置" hidden><div class="icp-toolgroup"><label>来源 <select class="icp-caption-source" aria-label="字幕来源"><option value="platform">平台字幕</option><option value="qwen-cache">Qwen 原版 · 录播缓存</option><option value="whisper-live">Whisper 流式（备用）</option></select></label><label class="icp-qwen-wait-setting" hidden>字幕等待上限 <select class="icp-qwen-wait" aria-label="字幕等待上限"><option value="0">不等待</option><option value="3">3 秒</option><option value="5" selected>5 秒</option><option value="10">10 秒</option><option value="15">15 秒</option></select></label><button class="icp-cache-auto" type="button" aria-pressed="true" hidden>整课缓存：开</button><button class="icp-whisper-settings" type="button">关键词与连接</button><button class="icp-whisper-retry" type="button">重新识别</button><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button></div><div class="icp-caption-options icp-voice-options" aria-label="人声增强设置"><label>降噪 <select class="icp-voice-strength" aria-label="降噪强度"><option value="light">轻度</option><option value="standard" selected>标准</option></select></label><label>音量 <select class="icp-voice-level" aria-label="自动音量"><option value="on" selected>自动稳定</option><option value="off">关闭自动稳定</option></select></label><label>音色 <select class="icp-voice-tone" aria-label="增强音色"><option value="natural" selected>自然</option><option value="clear">清晰</option></select></label><label>拖尾 <select class="icp-voice-tail" aria-label="轻度拖尾抑制"><option value="off" selected>关闭</option><option value="on">轻度（实验）</option></select></label></div><div class="icp-caption-options"><label>字幕字号 <select class="icp-caption-size"><option value="small">小</option><option value="medium" selected>标准</option><option value="large">大</option></select></label><label>字幕背景 <select class="icp-caption-background"><option value="soft">浅</option><option value="medium" selected>标准</option><option value="solid">深</option></select></label><label>字幕位置 <select class="icp-caption-position"><option value="bottom" selected>下方</option><option value="top">上方</option></select></label></div></section>
           <div class="icp-hint">空格播放/暂停 · ←/→ 快退/快进 · F 全屏 · P 画中画 · C 字幕 · 人声增强默认关闭</div>
         </main>
@@ -44,7 +44,7 @@
     request:qwenRequest,pause:()=>video.pause(),resume:()=>{if(!panel.hidden)void video.play().catch(()=>{});},
     onCues:cues=>{if(state.captionSource!=='qwen-cache')return;state.cues=cues;state.localCues=cues;sutro.setCues('qwen-cache',cues);applyTrackPosition();renderTranscript();updateQwenCaption();},
     onProgress:renderCacheProgress,
-    onStatus:(text,waiting)=>{if(state.captionSource==='qwen-cache'){$('.icp-subtitle-status').textContent=text;$('.icp-qwen-cancel').hidden=!waiting;if(!qwen.busy)$('.icp-cache-phase').textContent=text;}}
+    onStatus:(text,waiting,info)=>{if(state.captionSource==='qwen-cache'){$('.icp-subtitle-status').hidden=true;const note=$('.icp-qwen-state');note.hidden=false;note.textContent=text;note.dataset.failed=String(Boolean(info?.failed));$('.icp-qwen-cancel').hidden=!waiting;$('.icp-cache-phase').textContent=text;}}
   });
   const waitControl=$('.icp-qwen-wait');
   const savedWait=storageGet('icp:settings:qwen-wait');
@@ -263,6 +263,7 @@
     qwen.stop();$('.icp-qwen-cancel').hidden=true;
     streamRestart++;
     state.captionSource = $('.icp-caption-source').value;
+    $('.icp-qwen-state').hidden=state.captionSource!=='qwen-cache';$('.icp-subtitle-status').hidden=state.captionSource==='qwen-cache';
     $('.icp-cache-progress').hidden=state.captionSource!=='qwen-cache';
     state.asrEpoch++;
     const local = isStreaming();
@@ -616,11 +617,11 @@
     const request=(type,relayId)=>chrome.runtime.sendMessage({target:'qwen-background',type,chunk,relayId,requestId,courseId:state.currentCourseId||state.courseId});
     try{
       if(signal.aborted)throw new DOMException('已取消','AbortError');
-      $('.icp-cache-phase').textContent='查询本地字幕…';
+      qwen.setPhase('查询本地字幕缓存');
       const saved=await request('cached-chunk');
       if(!saved?.ok)throw Error(saved?.error||'本地字幕缓存未响应');
-      if(saved.result){$('.icp-subtitle-status').textContent='Qwen · 已读取本地字幕';return saved.result;}
-      $('.icp-subtitle-status').textContent='Qwen · 正在准备当前窗口的分段读取…';
+      if(saved.result)return saved.result;
+      qwen.setPhase('本地缓存未命中，正在准备音频分段读取');
       const token=state.loadToken,courseId=state.currentCourseId||state.courseId,lectureId=state.current.id;
       if(qwenRead.source!==chunk.source){qwenRead.source=chunk.source;qwenRead.url=chunk.source;}
       relay=await QwenRange.open({url:qwenRead.url,refreshUrl:async refreshSignal=>{
@@ -628,7 +629,7 @@
           if(token!==state.loadToken||refreshSignal.aborted)throw new DOMException('已取消','AbortError');
           qwenRead.url=fresh;
           return fresh;
-        },source:chunk.source,send:qwenMedia,signal,onStatus:text=>{if(!signal.aborted){$('.icp-cache-phase').textContent=text;$('.icp-subtitle-status').textContent=text.replace('当前窗口',chunk.start<=video.currentTime&&video.currentTime<chunk.start+20?'当前窗口':'后续窗口')+' · '+qwen.completed.size+'/'+Math.ceil(chunk.duration/20);}},onPhase:phase=>{if(!signal.aborted&&phase==='recognizing')$('.icp-cache-phase').textContent='音频读取完成 · 正在识别与对齐时间戳';}});
+        },source:chunk.source,send:qwenMedia,signal,onStatus:text=>{if(!signal.aborted)qwen.setPhase(text.replace(/^Qwen · /,'').replace('当前窗口','音频'));},onPhase:phase=>{if(!signal.aborted&&phase==='recognizing')qwen.setPhase('音频读取完成，正在识别与对齐时间戳');}});
       const reply=await request('relay-chunk',relay.id);
       if(relay.error)throw relay.error;
       if(signal.aborted)throw new DOMException('已取消','AbortError');
@@ -666,7 +667,7 @@
     if(complete&&!cacheWasComplete)box.open=false;
     cacheWasComplete=complete;
     const percent=p.total?Math.round(p.completed/p.total*100):0;
-    $('.icp-cache-count').textContent='字幕缓存 '+p.completed+'/'+p.total+' · '+percent+'%';
+    $('.icp-cache-count').textContent='字幕缓存 '+p.completed+'/'+p.total+' · '+percent+'%'+(qwen.failure?' · 已停止':'');
     $('.icp-cache-meter').max=p.total||1;$('.icp-cache-meter').value=p.completed;
     $('.icp-cache-window').textContent=p.start!==null?'窗口 '+clockLabel(p.start)+'–'+clockLabel(p.end):p.completed===p.total&&p.total?'整课完成':p.active?'前方就绪':'已停止';
     const map=$('.icp-cache-map');map.replaceChildren();
@@ -674,18 +675,20 @@
     for(const range of ranges){const span=document.createElement('span');span.style.left=range.start/p.duration*100+'%';span.style.width=(range.end-range.start)/p.duration*100+'%';map.append(span);}
     if(p.start!==null&&p.duration){const span=document.createElement('span');span.className='icp-cache-pending';span.style.left=p.start/p.duration*100+'%';span.style.width=(p.end-p.start)/p.duration*100+'%';map.append(span);}
     map.setAttribute('aria-label','已缓存 '+p.completed+' 个窗口，共 '+p.total+' 个；蓝色为已完成区域');
-    if(p.start===null)$('.icp-cache-phase').textContent='蓝色区域已保存到本地；灰色区域待识别';
+    // Phase and failure text come from the same Qwen status state; progress never overwrites them.
   }
   function restartQwen(){
     state.cues=[];state.localCues=[];$('.icp-local-caption').hidden=true;$('.icp-local-caption').textContent='';renderTranscript();sutro.setCues('qwen-cache',[]);qwen.reset(true);if(!qwen.active)qwen.start();
   }
   function updateQwenCaption(){
     if(state.captionSource!=='qwen-cache')return;
+    qwen.publishStatus();
     const cue=state.cues.find(c=>video.currentTime>=c.start&&video.currentTime<c.end);
     $('.icp-local-caption').textContent=cue?.text||'';$('.icp-local-caption').hidden=!state.captionOn||!cue;
   }
   function clearSubtitle() {
     cacheWasComplete=false;
+    $('.icp-qwen-state').hidden=true;$('.icp-subtitle-status').hidden=false;
     sutro.clear();qwen.stop();qwen.cache.clear();$('.icp-qwen-cancel').hidden=true;
     streamRestart++;
     video.querySelectorAll('track').forEach((track) => track.remove());

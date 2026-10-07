@@ -109,3 +109,41 @@ test('caption layout chooses natural boundaries and preserves identifiers and pu
   assert.ok(cues.every(c=>c.end>c.start),sample.name);
  }
 });
+
+test('later-window failure reports its range, keeps current cues, and stays visible after playback enters the gap',async()=>{
+ const pos={source:'clip',duration:100,time:0,rate:1,paused:true};const statuses=[];let cues=[];
+ const c=new Cache({snapshot:()=>pos,request:async x=>{if(x.start===20)throw Error('音频未完整覆盖当前窗口');return {start:x.start,cues:[{start:0,end:19,text:'已有字幕'}]};},onCues:x=>cues=x,onStatus:(text,waiting,info)=>statuses.push(info),pause:()=>{},resume:()=>{}});
+ try{c.start();await wait();
+  assert.equal(c.active,false);assert.equal(c.completed.size,1);assert.equal(cues[0].text,'已有字幕');
+  let status=statuses.at(-1);assert.equal(status.currentReady,true);assert.equal(status.failed,true);
+  assert.match(status.text,/后续窗口 0:20–0:40 失败/);assert.match(status.text,/解码音频短于请求窗口/);assert.match(status.text,/具体原因未确认/);assert.match(status.text,/缓存已停止，已有字幕保留/);assert.match(status.text,/重新载入/);
+  pos.time=25;c.reset();c.tick();status=statuses.at(-1);assert.equal(status.currentReady,false);assert.match(status.text,/当前位置字幕未就绪/);assert.match(status.text,/当前窗口 0:20–0:40 失败/);
+  c.report();assert.equal(statuses.at(-1),status,'progress does not erase failure');
+ }finally{c.stop();}
+});
+test('connection error does not pretend to know the service stopped; retries clear stale failure',async()=>{
+ const pos={source:'clip',duration:20,time:0,rate:1,paused:true};let broken=true,status;
+ const c=new Cache({snapshot:()=>pos,request:async x=>{if(broken)throw Error('无法连接 Qwen 本地服务（127.0.0.1:8768）');return {start:x.start,cues:[]};},onCues:()=>{},onStatus:(text,w,info)=>status=info,pause:()=>{},resume:()=>{}});
+ try{c.start();await wait();assert.match(status.text,/尚不能确认/);assert.equal(status.currentReady,false);
+ broken=false;c.start();await wait();assert.equal(status.failed,false);assert.equal(status.currentReady,true);assert.match(status.text,/停顿处可能无字幕/);assert.match(status.text,/全课字幕已缓存/);
+ }finally{c.stop();}
+});
+test('reading and recognition phases identify the processing range and do not claim uncached playback is ready',()=>{
+ const pos={source:'clip',duration:100,time:42,rate:1,paused:true};let status;
+ const c=new Cache({snapshot:()=>pos,request:()=>new Promise(()=>{}),onCues:()=>{},onStatus:(text,w,info)=>status=info,pause:()=>{},resume:()=>{}});
+ try{c.start();c.setPhase('音频读取完成，正在识别与对齐时间戳');
+ assert.match(status.text,/当前位置字幕未就绪/);assert.match(status.text,/当前窗口 0:40–1:00/);assert.match(status.text,/正在识别与对齐时间戳/);assert.doesNotMatch(status.text,/正在读取/);
+ }finally{c.stop();}
+});
+test('failure messages distinguish access denied, missing key, and hide signed URLs',async()=>{
+ for(const [error,pattern,absent] of [['浏览器分段读取失败：HTTP 403',/课程服务器拒绝音频访问/,/服务未启动/],['本地连接密钥无效',/连接密钥缺失或无效/,/HTTP/],['error https://host/video?token=secret',/具体原因未确认/,/secret/]]){
+  let status;const c=new Cache({snapshot:()=>({source:'clip',duration:20,time:0,rate:1,paused:true}),request:async()=>{throw Error(error);},onCues:()=>{},onStatus:text=>status=text,pause:()=>{},resume:()=>{}});
+  try{c.start();await wait();assert.match(status,pattern);assert.doesNotMatch(status,absent);}finally{c.stop();}
+ }
+});
+
+test('unsupported speed remains explicit when playback time updates publish status',()=>{
+ const pos={source:'clip',duration:100,time:0,rate:3,paused:true};let text;
+ const c=new Cache({snapshot:()=>pos,request:()=>assert.fail('unsupported speed'),onCues:()=>{},onStatus:x=>text=x,pause:()=>{},resume:()=>{}});
+ try{c.start();c.publishStatus();assert.match(text,/当前倍速超出支持范围/);assert.match(text,/0.75×–2×/);}finally{c.stop();}
+});

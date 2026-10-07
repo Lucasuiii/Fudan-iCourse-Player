@@ -159,8 +159,8 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
       method:message.type==='health'?'GET':'POST',signal:controller.signal,
       headers:{Authorization:'Bearer '+whisperKey,'Content-Type':'application/json'},
       ...(message.type==='media'?{body:JSON.stringify({...message.media,owner})}:['chunk','cached-chunk','export-captions','relay-chunk'].includes(message.type)?{body:JSON.stringify({source:message.chunk?.source,start:message.chunk?.start,duration:message.chunk?.duration,prompt,...(message.type==='relay-chunk'?{relayId:message.relayId,owner}:['cached-chunk','export-captions'].includes(message.type)?{owner}:{})})}:{})
-    });
-    const result=await response.json();if(!response.ok)throw Error(result.error||'Qwen 服务不可用');return result;
+    }).catch(error=>{if(controller.signal.aborted)throw error;throw Error('无法连接 Qwen 本地服务（127.0.0.1:8768）；具体原因未确认');});
+    const result=await response.json();if(!response.ok)throw Error(result.error||'Qwen 服务返回 HTTP '+response.status);return result;
   })().then(result=>respond({ok:true,result}),error=>respond({ok:false,error:controller.signal.aborted?'Qwen 请求已取消或超时':error.message}))
     .finally(()=>{clearTimeout(timeout);if(qwenRequests.get(id)===controller)qwenRequests.delete(id);});
   return true;

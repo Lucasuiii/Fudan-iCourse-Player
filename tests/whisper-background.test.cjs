@@ -2,11 +2,11 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
-function app(prompts={'11':'QR 分解'}){
+function app(prompts={'11':'QR 分解'},fetchImpl){
  const listeners=[],calls=[];
  const event={addListener(){}};
  const chrome={runtime:{id:'own',getURL:p=>'chrome-extension://own/'+p,onMessage:{addListener:f=>listeners.push(f)}},tabs:{onRemoved:event,onUpdated:event},action:{onClicked:event},storage:{local:{get:async()=>({whisperKey:'private',whisperPrompts:prompts})}}};
- vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../course-terms.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../background.js'),'utf8'),{chrome,AbortSignal,AbortController,setTimeout,clearTimeout,fetch:async(url,init)=>{calls.push({url,init});return {ok:true,json:async()=>({cues:[]})};}});
+ vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../course-terms.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../background.js'),'utf8'),{chrome,AbortSignal,AbortController,setTimeout,clearTimeout,fetch:fetchImpl||(async(url,init)=>{calls.push({url,init});return {ok:true,json:async()=>({cues:[]})};})});
  const send=(message,sender={id:'own',tab:{id:1}})=>new Promise(resolve=>{let waiting=false;for(const f of listeners)waiting=f({target:'whisper-background',courseId:'11',...message},sender,resolve)===true||waiting;if(!waiting)resolve(null);});
  return {send,calls,chrome};
 }
@@ -72,4 +72,15 @@ test('numerical course inference has no implicit glossary when its settings are 
  await a.send({type:'chunk',courseId:'38146',chunk:{source:'https://icourse.fudan.edu.cn/a.mp4',start:0,duration:100}});
  assert.equal(JSON.parse(a.calls[0].init.body).prompt,'');
  assert.equal(Object.hasOwn(JSON.parse(a.calls[1].init.body),'prompt'),false);
+});
+
+test('Qwen loopback connection failure is explicit without claiming a confirmed shutdown',async()=>{
+ const a=app({},async()=>{throw TypeError('Failed to fetch');});
+ const reply=await a.send({target:'qwen-background',type:'cached-chunk',requestId:'offline',chunk:{source:'clip',start:0,duration:20}});
+ assert.equal(reply.ok,false);assert.match(reply.error,/无法连接 Qwen 本地服务/);assert.match(reply.error,/127.0.0.1:8768/);assert.match(reply.error,/具体原因未确认/);assert.doesNotMatch(reply.error,/服务已退出|服务未启动/);
+});
+test('Qwen service HTTP errors preserve the service reason instead of becoming connection failures',async()=>{
+ const a=app({},async()=>({ok:false,status:503,json:async()=>({error:'音频未完整覆盖当前窗口'})}));
+ const reply=await a.send({target:'qwen-background',type:'relay-chunk',requestId:'short',chunk:{source:'clip',start:0,duration:20}});
+ assert.equal(reply.error,'音频未完整覆盖当前窗口');
 });
