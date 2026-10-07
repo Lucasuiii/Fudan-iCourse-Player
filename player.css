@@ -225,9 +225,10 @@
 #icp-panel .icp-now strong{font-size:13px;font-weight:550}
 #icp-panel .icp-more{order:1;margin:8px 0 0;padding:12px;gap:12px;border-radius:12px}
 #icp-panel .icp-toolgroup button,#icp-panel .icp-toolgroup label{min-height:32px;font-size:11px;padding:0 9px}
-#icp-panel .icp-export-controls{display:flex;gap:6px;align-items:center}
+#icp-panel .icp-export-controls{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 #icp-panel .icp-export-controls button,#icp-panel .icp-export-controls select{font:inherit;font-size:11px;padding:6px 8px;border:1px solid var(--icp-line);border-radius:8px;background:var(--icp-control);color:var(--icp-ink)}
-#icp-panel .icp-export-controls button{flex:1;cursor:pointer}
+#icp-panel .icp-export-controls button{flex:1;cursor:pointer;white-space:nowrap}
+#icp-panel .icp-export-controls .icp-generate{flex-basis:100%;order:1}
 #icp-panel .icp-stage{max-height:calc(100dvh - 250px);aspect-ratio:16/9;min-height:180px}
 @media(max-width:820px){#icp-panel .icp-stage{max-height:none;min-height:0}#icp-panel .icp-tools{flex-wrap:wrap}}
 

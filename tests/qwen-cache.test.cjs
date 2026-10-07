@@ -1,5 +1,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
-const Cache=require('../qwen-cache.js');
+const Scheduler=require('../qwen-cache.js');
+// Legacy whole-course tests explicitly opt into the now user-initiated generation task.
+class Cache extends Scheduler {start(){super.start();this.setContinuous(true);}}
 const wait=()=>new Promise(r=>setTimeout(r,0));
 test('Qwen automatically continues to the end and a speed change keeps cached cues',async()=>{
  let position={source:'clip',duration:200,time:0,rate:2,paused:false,live:false},calls=[],paused=0,resumed=0,cues=[];
@@ -54,10 +56,10 @@ test('background caching can finish remaining windows after playback reaches the
  const c=new Cache({snapshot:()=>pos,request:async x=>{calls.push(x.start);return {start:x.start,cues:[]};},onCues:()=>{},onStatus:()=>{},pause:()=>{},resume:()=>{}});
  try{c.start();await wait();assert.deepEqual(calls,[80,0,20,40,60]);}finally{c.stop();}
 });
-test('turning off whole-course caching retains only the near playback horizon',async()=>{
+test('turning off whole-course generation while paused stops new requests',async()=>{
  const pos={source:'clip',duration:300,time:0,rate:1,paused:true};const calls=[];
  const c=new Cache({snapshot:()=>pos,request:async x=>{calls.push(x.start);return {start:x.start,cues:[]};},onCues:()=>{},onStatus:()=>{},pause:()=>{},resume:()=>{}});
- try{c.setContinuous(false);c.start();await wait();assert.deepEqual(calls,[0,20,40,60,80]);c.setContinuous(true);await wait();assert.equal(c.completed.size,15);}finally{c.stop();}
+ try{c.start();c.setContinuous(false);await wait();assert.deepEqual(calls,[0]);c.setContinuous(true);await wait();assert.equal(c.completed.size,15);}finally{c.stop();}
 });
 test('progress covers the partial last window and cleared/source-changed caches',async()=>{
  const pos={source:'clip',duration:45,time:0,rate:1,paused:true};const reports=[];
@@ -66,10 +68,10 @@ test('progress covers the partial last window and cleared/source-changed caches'
  c.stop();c.reset(true);assert.equal(reports.at(-1).completed,0);pos.source='other';pos.duration=20;c.start();await wait();assert.equal(reports.at(-1).completed,1);assert.equal(reports.at(-1).total,1);
  }finally{c.stop();}
 });
-test('near-horizon progress stops showing an active window after completion',async()=>{
+test('paused progress stops showing an active window after in-flight completion',async()=>{
  const pos={source:'clip',duration:300,time:0,rate:1,paused:true};let progress;
  const c=new Cache({snapshot:()=>pos,request:async x=>({start:x.start,cues:[]}),onCues:()=>{},onStatus:()=>{},onProgress:p=>progress=p,pause:()=>{},resume:()=>{}});
- try{c.setContinuous(false);c.start();await wait();assert.equal(progress.completed,5);assert.equal(progress.start,null);assert.equal(progress.total,15);}finally{c.stop();}
+ try{c.start();c.setContinuous(false);await wait();assert.equal(progress.completed,1);assert.equal(progress.start,null);assert.equal(progress.total,15);}finally{c.stop();}
 });
 
 test('initial wait resumes at five seconds while inference continues; later gaps do not pause again',async t=>{
@@ -162,4 +164,79 @@ test('saved-cache hydration keeps all completed markers but bounds in-page cues 
  const pos={source:'clip',duration:4000,time:2000,rate:1,paused:true};
  const c=new Cache({snapshot:()=>pos,loadSaved:async()=>({windows:Array.from({length:200},(_,i)=>({start:i*20,end:i*20+20,cues:[]}))}),request:()=>assert.fail('already saved'),onCues:()=>{},onStatus:()=>{},pause:()=>{},resume:()=>{}});
  try{c.start();await wait();assert.equal(c.completed.size,200);assert.equal(c.cache.size,180);assert.ok(c.cache.has(2000));}finally{c.stop();}
+});
+
+function setupScheduler(pos,request,extra={}){
+ return new Scheduler({snapshot:()=>pos,request,onCues:()=>{},onStatus:()=>{},pause:()=>{pos.paused=true;},resume:()=>{pos.paused=false;},...extra});
+}
+test('default scheduler rests after 60 viewing seconds and refills only below low water',async()=>{
+ const pos={source:'clip',duration:400,time:0,rate:1,paused:false},calls=[];
+ const c=setupScheduler(pos,async x=>{calls.push(x.start);return {start:x.start,cues:[],cached:true};});
+ try{c.start();await wait();assert.equal(c.continuous,false);assert.deepEqual(calls,[0,20,40]);
+ pos.time=10;c.tick();await wait();assert.equal(calls.length,3);
+ pos.time=45;c.tick();await wait();assert.deepEqual(calls,[0,20,40,60,80,100]);
+ }finally{c.stop();}
+});
+test('2x reserves 120 media seconds and a speed change refills the protected area',async()=>{
+ const pos={source:'clip',duration:400,time:0,rate:1,paused:false},calls=[];
+ const c=setupScheduler(pos,async x=>{calls.push(x.start);return {start:x.start,cues:[],cached:true};});
+ try{c.start();await wait();pos.rate=2;c.tick();await wait();assert.deepEqual(calls,[0,20,40,60,80,100]);}finally{c.stop();}
+});
+test('sparse prefetch protects playback first, then visits odd blocks before even blocks',async()=>{
+ const pos={source:'clip',duration:200,time:0,rate:1,paused:false},calls=[];
+ const c=setupScheduler(pos,async x=>{calls.push(x.start);return {start:x.start,cues:[],cached:true};});c.setSchedule('skip','standard');
+ try{c.start();await wait();assert.deepEqual(calls,[0,20,40,80,120,160,60,100,140,180]);}finally{c.stop();}
+});
+test('pausing allows in-flight result to finish but starts no new inference, including seeks',async()=>{
+ const pos={source:'clip',duration:200,time:0,rate:1,paused:false},pending=[];
+ const c=setupScheduler(pos,x=>new Promise(resolve=>pending.push({x,resolve})));
+ try{c.start();pending[0].resolve({start:0,cues:[],cached:true});await wait();assert.equal(pending[1].x.start,20);
+ pos.paused=true;c.cancelResume();pending[1].resolve({start:20,cues:[],cached:true});await wait();assert.equal(pending.length,2);
+ pos.time=100;c.reset();assert.equal(pending.length,2);pos.paused=false;c.tick();assert.equal(pending[2].x.start,100);
+ }finally{c.stop();}
+});
+test('paused opening hydrates cache without recognizing missing audio; whole-course action overrides pause',async()=>{
+ const pos={source:'clip',duration:60,time:0,rate:1,paused:true},calls=[];
+ const c=setupScheduler(pos,async x=>{calls.push(x.start);return {start:x.start,cues:[]};},{loadSaved:async()=>({windows:[]})});
+ try{c.start();await wait();assert.deepEqual(calls,[]);c.setContinuous(true);await wait();assert.deepEqual(calls,[0,20,40]);}finally{c.stop();}
+});
+test('low and standard rest intervals apply only to new inference; seek bypasses rest',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:1000});
+ for(const [strength,delay] of [['low',6000],['standard',3000]]){
+ const pos={source:'clip',duration:300,time:0,rate:1,paused:false},calls=[];
+ const c=setupScheduler(pos,async x=>{calls.push(x.start);return {start:x.start,cues:[]};});c.setSchedule('watch',strength);
+ try{c.start();await wait();assert.deepEqual(calls,[0]);assert.equal(c.restUntil,Date.now()+delay);
+ t.mock.timers.tick(delay-1);c.tick();assert.equal(calls.length,1);t.mock.timers.tick(1);c.tick();await wait();assert.deepEqual(calls,[0,20]);
+ pos.time=180;c.reset();await wait();assert.equal(calls.at(-1),180);
+ }finally{c.stop();}
+ }
+});
+test('sparse work uses longer rests and a seek aborts stale work without losing prior cache',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:1000});
+ const pos={source:'clip',duration:200,time:0,rate:1,paused:false},pending=[];
+ const c=setupScheduler(pos,(x,signal)=>new Promise(resolve=>pending.push({x,signal,resolve})));
+ c.setSchedule('skip','low');
+ try{c.start();for(let i=0;i<3;i++){pending[i].resolve({start:i*20,cues:[],cached:true});await wait();}
+ assert.equal(pending[3].x.start,80);pending[3].resolve({start:80,cues:[]});await wait();assert.equal(c.restUntil,Date.now()+15000);
+ t.mock.timers.tick(15000);c.tick();assert.equal(pending[4].x.start,120);
+ pos.time=180;c.reset();assert.equal(pending[4].signal.aborted,true);assert.equal(pending[5].x.start,180);
+ pending[4].resolve({start:120,cues:[]});await wait();assert.equal(c.cache.has(120),false);assert.equal(c.cache.has(80),true);
+ }finally{c.stop();}
+});
+
+test('returning to continuous watching cancels sparse work and ignores its late result',async()=>{
+ const pos={source:'clip',duration:200,time:0,rate:1,paused:false},pending=[];
+ const c=setupScheduler(pos,(x,signal)=>new Promise(resolve=>pending.push({x,signal,resolve})));c.setSchedule('skip','standard');
+ try{c.start();for(let i=0;i<3;i++){pending[i].resolve({start:i*20,cues:[],cached:true});await wait();}
+ assert.equal(pending[3].x.start,80);c.setSchedule('watch','standard');assert.equal(pending[3].signal.aborted,true);
+ pending[3].resolve({start:80,cues:[]});await wait();assert.equal(c.cache.has(80),false);assert.equal(c.busy,false);assert.equal(pending.length,4);
+ }finally{c.stop();}
+});
+test('stopping whole-course generation cancels distant work and restores paused scheduling',async()=>{
+ const pos={source:'clip',duration:200,time:0,rate:1,paused:true},pending=[];let progress;
+ const c=setupScheduler(pos,(x,signal)=>new Promise(resolve=>pending.push({x,signal,resolve})),{onProgress:p=>progress=p});
+ try{c.start();c.setContinuous(true);for(let i=0;i<3;i++){pending[i].resolve({start:i*20,cues:[],cached:true});await wait();}
+ assert.equal(pending[3].x.start,60);assert.equal(c.requestKind,'whole');c.setContinuous(false);assert.equal(pending[3].signal.aborted,true);assert.equal(progress.wholeCourse,false);
+ pending[3].resolve({start:60,cues:[]});await wait();assert.equal(c.completed.size,3);assert.equal(pending.length,4);
+ }finally{c.stop();}
 });
