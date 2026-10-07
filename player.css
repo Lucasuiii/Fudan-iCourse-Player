@@ -287,3 +287,21 @@
 #icp-panel .icp-qwen-state[data-failed="true"]{color:var(--icp-error);font-size:12px}
 #icp-panel .icp-main:fullscreen .icp-qwen-state{color:#c5d2e4}
 #icp-panel .icp-main:fullscreen .icp-qwen-state[data-failed="true"]{color:#ffb4a7}
+
+/* Compact settings: common controls first, one native disclosure at a time. */
+#icp-panel .icp-stage .icp-more{display:block;box-sizing:border-box;width:300px;max-width:calc(100% - 24px);right:12px;bottom:70px;padding:12px;max-height:calc(100% - 82px);margin:0}
+#icp-panel .icp-settings-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:12px}
+#icp-panel .icp-settings-close{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--icp-muted);font-size:20px;cursor:pointer}
+#icp-panel .icp-settings-close:hover{background:var(--icp-hover)}
+#icp-panel .icp-settings-primary{display:grid;gap:8px;margin-bottom:8px}
+#icp-panel .icp-settings-primary>label,#icp-panel .icp-setting-fields>label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--icp-muted)}
+#icp-panel .icp-settings-primary>button,#icp-panel .icp-setting-fields>button{min-height:30px;padding:6px 10px;border:1px solid var(--icp-line);border-radius:8px;background:var(--icp-control);color:var(--icp-ink);font:inherit;font-size:12px;cursor:pointer}
+#icp-panel .icp-settings-primary>button[aria-pressed="true"]{color:var(--icp-accent);background:var(--icp-accent-soft);border-color:var(--icp-accent)}
+#icp-panel .icp-settings-group{border-top:1px solid var(--icp-line)}
+#icp-panel .icp-settings-group>summary{display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer;list-style:none;font-size:12px;color:var(--icp-ink)}
+#icp-panel .icp-settings-group>summary::-webkit-details-marker{display:none}
+#icp-panel .icp-settings-group>summary::after{content:'⌄';color:var(--icp-muted)}
+#icp-panel .icp-settings-group[open]>summary::after{transform:rotate(180deg)}
+#icp-panel .icp-setting-fields{display:grid;gap:8px;padding:0 0 10px}
+#icp-panel .icp-more select{max-width:170px;min-height:30px;font:inherit;font-size:12px;padding:4px 7px}
+#icp-panel .icp-settings-close:focus-visible,#icp-panel .icp-settings-group>summary:focus-visible{outline:2px solid var(--icp-accent);outline-offset:2px}
