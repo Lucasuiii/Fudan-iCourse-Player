@@ -147,3 +147,19 @@ test('unsupported speed remains explicit when playback time updates publish stat
  const c=new Cache({snapshot:()=>pos,request:()=>assert.fail('unsupported speed'),onCues:()=>{},onStatus:x=>text=x,pause:()=>{},resume:()=>{}});
  try{c.start();c.publishStatus();assert.match(text,/当前倍速超出支持范围/);assert.match(text,/0.75×–2×/);}finally{c.stop();}
 });
+
+test('reopening loads saved timestamped windows before any missing-window recognition',async()=>{
+ const pos={source:'clip',duration:60,time:25,rate:2,paused:true};const calls=[],statuses=[];let cues=[];
+ const c=new Cache({snapshot:()=>pos,loadSaved:async()=>({windows:[{start:0,end:20,cues:[{start:1,end:2,text:'旧字幕'}]},{start:20,end:40,cues:[{start:25,end:28,text:'当前字幕'}]}]}),request:async x=>{calls.push(x.start);return {start:x.start,cues:[]};},onCues:x=>cues=x,onStatus:t=>statuses.push(t),pause:()=>assert.fail('cached position should not pause'),resume:()=>{}});
+ try{c.start();await wait();assert.deepEqual(calls,[40]);assert.equal(c.completed.size,3);assert.equal(cues.length,2);assert.match(statuses[0],/正在加载本机已保存/);assert.match(statuses.at(-1),/全课字幕已缓存/);}finally{c.stop();}
+});
+test('a cancelled saved-cache load cannot populate a different recording',async()=>{
+ const pos={source:'one',duration:20,time:0,rate:1,paused:true};let resolve;
+ const c=new Cache({snapshot:()=>pos,loadSaved:()=>new Promise(r=>resolve=r),request:()=>assert.fail('stale load'),onCues:()=>assert.fail('stale cues'),onStatus:()=>{},pause:()=>{},resume:()=>{}});
+ c.start();c.stop();pos.source='two';resolve({windows:[{start:0,end:20,cues:[]}]});await wait();assert.equal(c.cache.size,0);
+});
+test('saved-cache hydration keeps all completed markers but bounds in-page cues near playback',async()=>{
+ const pos={source:'clip',duration:4000,time:2000,rate:1,paused:true};
+ const c=new Cache({snapshot:()=>pos,loadSaved:async()=>({windows:Array.from({length:200},(_,i)=>({start:i*20,end:i*20+20,cues:[]}))}),request:()=>assert.fail('already saved'),onCues:()=>{},onStatus:()=>{},pause:()=>{},resume:()=>{}});
+ try{c.start();await wait();assert.equal(c.completed.size,200);assert.equal(c.cache.size,180);assert.ok(c.cache.has(2000));}finally{c.stop();}
+});

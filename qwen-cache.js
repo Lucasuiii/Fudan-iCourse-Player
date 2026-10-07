@@ -60,8 +60,8 @@
     return {reason:raw,action:'点击「识别与增强 → 重新载入」重试'};
   }
   class QwenCache {
-    constructor({snapshot,request,onCues,onStatus,onProgress=()=>{},pause,resume,waitLimitMs=5000}) {
-      Object.assign(this,{snapshot,request,onCues,onStatus,onProgress,pause,resume});
+    constructor({snapshot,request,loadSaved,onCues,onStatus,onProgress=()=>{},pause,resume,waitLimitMs=5000}) {
+      Object.assign(this,{snapshot,request,loadSaved,onCues,onStatus,onProgress,pause,resume});
       this.cache=new Map();this.completed=new Set();this.continuous=true;this.epoch=0;this.active=false;this.busy=false;this.waiting=false;this.dirty=false;
       this.waitExpired=false;this.setWaitLimit(waitLimitMs);
     }
@@ -92,7 +92,7 @@
       this.onProgress({duration,total:Math.ceil(duration/20),completed:windows.length,windows,
         start:this.busy?this.requestStart:null,end:this.busy?Math.min(duration,this.requestStart+20):null,active:this.active});
     }
-    start(){this.stop();this.failure=null;this.blocked=null;this.waitExpired=false;this.active=true;this.timer=setInterval(()=>this.tick(),500);this.tick();}
+    start(){this.stop();this.failure=null;this.blocked=null;this.loadedSaved=false;this.waitExpired=false;this.active=true;this.timer=setInterval(()=>this.tick(),500);this.tick();}
     stop(){this.active=false;clearInterval(this.timer);this.epoch++;this.controller?.abort();this.controller=null;this.busy=false;this.release();this.report();}
     release(){clearTimeout(this.waitTimer);this.waitTimer=null;if(this.waiting){this.waiting=false;const play=this.wasPlaying;this.wasPlaying=false;if(play)this.resume();}}
     setWaitLimit(ms){
@@ -117,17 +117,34 @@
       if(this.active)this.tick();
     }
     cancelResume(){this.wasPlaying=false;}
-    reset(clear=false){if(clear)this.failure=null;this.epoch++;this.controller?.abort();this.controller=null;this.busy=false;if(clear){this.cache.clear();this.completed.clear();}this.release();this.waitExpired=false;if(this.active)this.tick();else this.report();}
+    reset(clear=false){if(clear){this.failure=null;this.loadedSaved=false;}this.epoch++;this.controller?.abort();this.controller=null;this.busy=false;if(clear){this.cache.clear();this.completed.clear();}this.release();this.waitExpired=false;if(this.active)this.tick();else this.report();}
     tick(){
       if(!this.active){if(this.failure)this.publishStatus();return;}
       const s=this.snapshot();
       if(!s.source||!Number.isFinite(s.duration)||s.duration<=0||!Number.isFinite(s.time)||s.time<0||s.time>s.duration||s.live){if(this.busy||this.waiting){this.epoch++;this.controller?.abort();this.busy=false;this.release();}this.blocked='未加载有效录播，无法准备字幕；请选择已加载的录播课次';this.report();return this.publishStatus();}
       if(s.rate<0.75||s.rate>2){if(this.busy||this.waiting){this.epoch++;this.controller?.abort();this.busy=false;this.release();}this.blocked='缓存暂停：当前倍速超出支持范围，请调整到 0.75×–2×';this.report();return this.publishStatus();}
       this.blocked=null;
-      if(this.source!==s.source){this.release();this.waitExpired=false;this.source=s.source;this.cache.clear();this.completed.clear();}
+      if(this.source!==s.source){this.release();this.waitExpired=false;this.source=s.source;this.loadedSaved=false;this.cache.clear();this.completed.clear();}
       const start=Math.floor(Math.min(s.time,s.duration-0.001)/20)*20;
       if(this.busy&&!this.cache.has(start)&&this.requestStart!==start){this.epoch++;this.controller?.abort();this.busy=false;this.controller=null;}
 
+      if(this.loadSaved&&!this.loadedSaved&&!this.busy){
+        const epoch=this.epoch,source=s.source,controller=new AbortController();
+        this.controller=controller;this.busy=true;this.requestStart=start;this.phase='正在加载本机已保存的本课字幕';this.report();this.publishStatus();
+        this.loadSaved({source,duration:s.duration},controller.signal).then(result=>{
+          if(!this.active||epoch!==this.epoch||source!==this.snapshot().source)return;
+          if(!Array.isArray(result?.windows))throw Error('本地字幕缓存返回无效');
+          const windows=result.windows.filter(w=>Number.isInteger(w.start)&&w.start>=0&&w.start%20===0&&w.start<s.duration&&w.end===Math.min(s.duration,w.start+20)&&Array.isArray(w.cues));
+          windows.sort((a,b)=>Math.abs(a.start-start)-Math.abs(b.start-start));
+          this.completed=new Set(windows.map(w=>w.start));this.cache=new Map(windows.slice(0,180).map(w=>[w.start,w]));
+          this.loadedSaved=true;this.dirty=true;
+          this.onCues(layout(this.cache.values()));this.dirty=false;
+        }).catch(error=>{
+          if(epoch!==this.epoch||!this.active||error.name==='AbortError')return;
+          this.failure={start,...failureReason(error.message)};this.active=false;clearInterval(this.timer);this.busy=false;this.release();this.report();this.publishStatus();
+        }).finally(()=>{if(epoch===this.epoch){this.busy=false;this.controller=null;if(this.active)this.tick();}});
+        return;
+      }
       const current=this.cache.get(start);
       if(current){this.release();if(this.dirty){this.dirty=false;this.onCues(layout(this.cache.values()));}}
       if(this.busy){this.publishStatus();return;}

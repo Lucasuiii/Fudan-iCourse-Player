@@ -41,7 +41,7 @@
   $('.icp-stage').append($('.icp-more'));
   const qwen = new QwenCache({
     snapshot:()=>({source:video.currentSrc||video.src,duration:video.duration,time:video.currentTime,rate:video.playbackRate,paused:video.paused,live:state.live}),
-    request:qwenRequest,pause:()=>video.pause(),resume:()=>{if(!panel.hidden)void video.play().catch(()=>{});},
+    request:qwenRequest,loadSaved:loadQwenSaved,pause:()=>video.pause(),resume:()=>{if(!panel.hidden)void video.play().catch(()=>{});},
     onCues:cues=>{if(state.captionSource!=='qwen-cache')return;state.cues=cues;state.localCues=cues;sutro.setCues('qwen-cache',cues);applyTrackPosition();renderTranscript();updateQwenCaption();},
     onProgress:renderCacheProgress,
     onStatus:(text,waiting,info)=>{if(state.captionSource==='qwen-cache'){$('.icp-subtitle-status').hidden=true;const note=$('.icp-qwen-state');note.hidden=false;note.textContent=text;note.dataset.failed=String(Boolean(info?.failed));$('.icp-qwen-cancel').hidden=!waiting;$('.icp-cache-phase').textContent=text;}}
@@ -543,6 +543,18 @@
         if (row.dataset.lectureId === state.current.id) describeProgress(row.querySelector('.icp-progress'), progress);
       }
     }
+  }
+  async function loadQwenSaved(chunk,signal){
+    const requestId=crypto.randomUUID();
+    const cancel=()=>{void chrome.runtime.sendMessage({target:'qwen-background',type:'cancel',requestId}).catch(()=>{});};
+    signal.addEventListener('abort',cancel,{once:true});
+    try{
+      if(signal.aborted)throw new DOMException('已取消','AbortError');
+      const reply=await chrome.runtime.sendMessage({target:'qwen-background',type:'export-captions',requestId,courseId:state.currentCourseId||state.courseId,chunk});
+      if(signal.aborted)throw new DOMException('已取消','AbortError');
+      if(!reply?.ok)throw Error(reply?.error||'本地字幕读取未响应');
+      return reply.result;
+    }finally{signal.removeEventListener('abort',cancel);}
   }
   async function qwenMedia(media){
     const reply=await chrome.runtime.sendMessage({target:'qwen-background',type:'media',requestId:crypto.randomUUID(),media});
