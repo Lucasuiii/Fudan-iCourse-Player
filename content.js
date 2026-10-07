@@ -23,11 +23,17 @@
       <details class="icp-course-switch"><summary>切换课程 / 直播</summary><div class="icp-topbar"><label>课程 ID <input class="icp-course-id" inputmode="numeric" placeholder="从课程网址获取" aria-label="课程 ID"></label><button class="icp-load" type="button">打开课程 <span aria-hidden="true">→</span></button><details class="icp-livebox"><summary>连接直播流</summary><div class="icp-livebar"><label>HLS 直播地址 <input class="icp-live-url" type="url" placeholder="粘贴有权限的 .m3u8 地址" aria-label="HLS 直播地址"></label><button class="icp-live-open" type="button">播放直播</button></div></details></div></details>
       <div class="icp-statusbar"><p class="icp-status" role="status">在 iCourse 登录后输入课程 ID，或从课程页面自动识别。</p><span class="icp-subtitle-status" role="status">字幕未加载</span><button class="icp-qwen-cancel" type="button" hidden>取消准备</button></div>
       <div class="icp-layout">
-        <aside class="icp-sidebar" id="icp-sidebar"><div class="icp-course"><small>当前课程</small><strong class="icp-course-title">尚未选择课程</strong><span class="icp-teacher"></span><span class="icp-resource-status" role="status"></span><button class="icp-probe-retry" type="button" hidden>重新检查资源</button></div><div class="icp-tabs" role="tablist" aria-label="侧栏"><button class="icp-tab icp-tab-active" type="button" id="icp-tab-lectures" data-tab="lectures" role="tab" aria-controls="icp-pane-lectures" aria-selected="true">课次</button><button class="icp-tab" type="button" id="icp-tab-transcript" data-tab="transcript" role="tab" aria-controls="icp-pane-transcript" tabindex="-1" aria-selected="false">逐句字幕</button></div><div class="icp-lectures-pane" id="icp-pane-lectures" role="tabpanel" aria-labelledby="icp-tab-lectures"><input class="icp-filter" type="search" placeholder="搜索课次" aria-label="搜索课次"><div class="icp-list" aria-label="课次列表"></div></div><div class="icp-transcript-pane" id="icp-pane-transcript" role="tabpanel" aria-labelledby="icp-tab-transcript" hidden><div class="icp-transcript-controls"><input class="icp-transcript-filter" type="search" placeholder="搜索字幕关键词" aria-label="搜索字幕"><div class="icp-export-controls"><select class="icp-export-format" aria-label="字幕导出格式"><option value="srt">SRT</option><option value="vtt">VTT</option></select><button class="icp-export" type="button">导出本课字幕</button></div><label class="icp-follow-label"><input class="icp-follow" type="checkbox" checked> 跟随播放</label></div><p class="icp-transcript-empty">选择课次后读取官方字幕</p><div class="icp-transcript-list"></div></div></aside>
+        <aside class="icp-sidebar" id="icp-sidebar"><div class="icp-course"><small>当前课程</small><strong class="icp-course-title">尚未选择课程</strong><span class="icp-teacher"></span><span class="icp-resource-status" role="status"></span><button class="icp-probe-retry" type="button" hidden>重新检查资源</button></div><div class="icp-tabs" role="tablist" aria-label="侧栏"><button class="icp-tab icp-tab-active" type="button" id="icp-tab-lectures" data-tab="lectures" role="tab" aria-controls="icp-pane-lectures" aria-selected="true">课次</button><button class="icp-tab" type="button" id="icp-tab-transcript" data-tab="transcript" role="tab" aria-controls="icp-pane-transcript" tabindex="-1" aria-selected="false">逐句字幕</button></div><div class="icp-lectures-pane" id="icp-pane-lectures" role="tabpanel" aria-labelledby="icp-tab-lectures"><input class="icp-filter" type="search" placeholder="搜索课次" aria-label="搜索课次"><div class="icp-list" aria-label="课次列表"></div></div><div class="icp-transcript-pane" id="icp-pane-transcript" role="tabpanel" aria-labelledby="icp-tab-transcript" hidden><div class="icp-transcript-controls"><input class="icp-transcript-filter" type="search" placeholder="搜索字幕关键词" aria-label="搜索字幕"><div class="icp-export-controls"><select class="icp-export-format" aria-label="字幕导出格式"><option value="srt">SRT</option><option value="vtt">VTT</option></select><button class="icp-generate" type="button" hidden>生成整课字幕</button><button class="icp-export" type="button">导出本课字幕</button></div><label class="icp-follow-label"><input class="icp-follow" type="checkbox" checked> 跟随播放</label></div><p class="icp-transcript-empty">选择课次后读取官方字幕</p><div class="icp-transcript-list"></div></div></aside>
         <main class="icp-main"><div class="icp-stage"><media-theme-sutro class="icp-theme"><video class="icp-video" slot="media" controls playsinline preload="metadata"></video></media-theme-sutro><div class="icp-local-caption" hidden></div><div class="icp-placeholder"><span>▶</span><strong>选择一节课次，开始观看</strong><small>你的课程 · 更舒服的播放体验</small></div></div>
           <div class="icp-now"><div><small>当前课次</small><strong class="icp-now-title">等待选择课次</strong></div><span class="icp-date"></span></div>
           <div class="icp-tools"><span class="icp-qwen-state" role="status" hidden></span><button class="icp-go-live" type="button" hidden>● 回到直播</button><button class="icp-more-toggle" type="button" aria-expanded="false" aria-controls="icp-more">识别与增强</button><details class="icp-cache-progress" hidden><summary class="icp-cache-count">字幕缓存 0/0</summary><div class="icp-cache-detail"><div class="icp-cache-window"></div><progress class="icp-cache-meter" max="1" value="0" aria-label="整课字幕缓存进度"></progress><div class="icp-cache-map" role="img" aria-label="字幕缓存时间分布"></div><small class="icp-cache-phase" role="status"></small></div></details></div>
-          <section class="icp-more" id="icp-more" aria-label="更多播放设置" hidden><div class="icp-toolgroup"><label>来源 <select class="icp-caption-source" aria-label="字幕来源"><option value="platform">平台字幕</option><option value="qwen-cache">Qwen 原版 · 录播缓存</option></select></label><label class="icp-qwen-wait-setting" hidden>字幕等待上限 <select class="icp-qwen-wait" aria-label="字幕等待上限"><option value="0">不等待</option><option value="3">3 秒</option><option value="5" selected>5 秒</option><option value="10">10 秒</option><option value="15">15 秒</option></select></label><button class="icp-cache-auto" type="button" aria-pressed="true" hidden>整课缓存：开</button><button class="icp-qwen-settings" type="button">关键词与连接</button><button class="icp-qwen-retry" type="button">重新识别</button><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button></div><div class="icp-caption-options icp-voice-options" aria-label="人声增强设置"><label>降噪 <select class="icp-voice-strength" aria-label="降噪强度"><option value="light">轻度</option><option value="standard" selected>标准</option></select></label><label>音量 <select class="icp-voice-level" aria-label="自动音量"><option value="on" selected>自动稳定</option><option value="off">关闭自动稳定</option></select></label><label>音色 <select class="icp-voice-tone" aria-label="增强音色"><option value="natural" selected>自然</option><option value="clear">清晰</option></select></label><label>拖尾 <select class="icp-voice-tail" aria-label="轻度拖尾抑制"><option value="off" selected>关闭</option><option value="on">轻度（实验）</option></select></label></div><div class="icp-caption-options"><label>字幕字号 <select class="icp-caption-size"><option value="small">小</option><option value="medium" selected>标准</option><option value="large">大</option></select></label><label>字幕背景 <select class="icp-caption-background"><option value="soft">浅</option><option value="medium" selected>标准</option><option value="solid">深</option></select></label><label>字幕位置 <select class="icp-caption-position"><option value="bottom" selected>下方</option><option value="top">上方</option></select></label></div></section>
+          <section class="icp-more" id="icp-more" aria-label="更多播放设置" hidden>
+            <div class="icp-settings-heading"><strong>识别与增强</strong><button class="icp-settings-close" type="button" aria-label="关闭识别与增强">×</button></div>
+            <div class="icp-settings-primary"><label>来源 <select class="icp-caption-source" aria-label="字幕来源"><option value="platform">平台字幕</option><option value="qwen-cache">Qwen 本地</option></select></label><button class="icp-denoise" type="button" aria-pressed="false">人声增强：关</button></div>
+            <details class="icp-settings-group icp-qwen-settings-group" hidden><summary>识别设置</summary><div class="icp-setting-fields"><label class="icp-qwen-wait-setting" hidden>字幕等待上限 <select class="icp-qwen-wait" aria-label="字幕等待上限"><option value="0">不等待</option><option value="3">3 秒</option><option value="5" selected>5 秒</option><option value="10">10 秒</option><option value="15">15 秒</option></select></label><label class="icp-qwen-schedule" hidden>调度 <select class="icp-qwen-mode" aria-label="字幕调度模式"><option value="watch">连续观看</option><option value="skip">跳看优先</option></select></label><label class="icp-qwen-budget" hidden>后台预取 <select class="icp-qwen-strength" aria-label="后台预取强度"><option value="low">低</option><option value="standard" selected>标准</option></select></label><button class="icp-qwen-settings" type="button">关键词与连接</button><button class="icp-qwen-retry" type="button">重新识别</button></div></details>
+            <details class="icp-settings-group"><summary>声音细调</summary><div class="icp-setting-fields icp-voice-options" aria-label="人声增强设置"><label>降噪 <select class="icp-voice-strength" aria-label="降噪强度"><option value="light">轻度</option><option value="standard" selected>标准</option></select></label><label>音量 <select class="icp-voice-level" aria-label="自动音量"><option value="on" selected>自动稳定</option><option value="off">关闭自动稳定</option></select></label><label>音色 <select class="icp-voice-tone" aria-label="增强音色"><option value="natural" selected>自然</option><option value="clear">清晰</option></select></label><label>拖尾 <select class="icp-voice-tail" aria-label="轻度拖尾抑制"><option value="off" selected>关闭</option><option value="on">轻度（实验）</option></select></label></div></details>
+            <details class="icp-settings-group"><summary>字幕样式</summary><div class="icp-setting-fields"><label>字幕字号 <select class="icp-caption-size"><option value="small">小</option><option value="medium" selected>标准</option><option value="large">大</option></select></label><label>字幕背景 <select class="icp-caption-background"><option value="soft">浅</option><option value="medium" selected>标准</option><option value="solid">深</option></select></label><label>字幕位置 <select class="icp-caption-position"><option value="bottom" selected>下方</option><option value="top">上方</option></select></label></div></details>
+          </section>
           <div class="icp-hint">空格播放/暂停 · ←/→ 快退/快进 · F 全屏 · P 画中画 · C 字幕 · 人声增强默认关闭</div>
         </main>
       </div>
@@ -77,7 +83,12 @@
   input.addEventListener('keydown', (event) => { if (event.key === 'Enter') loadCourse(); });
   filter.addEventListener('input', renderList);
   $('.icp-transcript-filter').addEventListener('input', renderTranscript);
-  $('.icp-cache-auto').addEventListener('click',()=>{qwen.setContinuous(!qwen.continuous);$('.icp-cache-auto').textContent='整课缓存：'+(qwen.continuous?'开':'关');$('.icp-cache-auto').setAttribute('aria-pressed',String(qwen.continuous));});
+  const modeControl=$('.icp-qwen-mode'),budgetControl=$('.icp-qwen-strength');
+  modeControl.value=storageGet('icp:settings:qwen-mode')==='skip'?'skip':'watch';
+  budgetControl.value=storageGet('icp:settings:qwen-strength')==='low'?'low':'standard';
+  const applySchedule=()=>{qwen.setSchedule(modeControl.value,budgetControl.value);storageSet('icp:settings:qwen-mode',modeControl.value);storageSet('icp:settings:qwen-strength',budgetControl.value);};
+  modeControl.addEventListener('change',applySchedule);budgetControl.addEventListener('change',applySchedule);applySchedule();
+  $('.icp-generate').addEventListener('click',()=>{if(!qwen.active)qwen.start();qwen.setContinuous(!qwen.continuous);});
   $('.icp-export').addEventListener('click',exportCaptions);
   $('.icp-follow').addEventListener('change', () => { state.activeCue = -1; updateActiveCue(); });
   $('.icp-tabs').addEventListener('keydown', (event) => {
@@ -100,6 +111,10 @@
     if (!open && more.contains(document.activeElement)) $('.icp-more-toggle').focus();
   }
   $('.icp-more-toggle').addEventListener('click', () => showMore(more.hidden));
+  $('.icp-settings-close').addEventListener('click',()=>showMore(false));
+  more.querySelectorAll('.icp-settings-group').forEach(group=>group.addEventListener('toggle',()=>{
+    if(group.open)more.querySelectorAll('.icp-settings-group').forEach(other=>{if(other!==group)other.open=false;});
+  }));
   function collapseSidebar(collapsed) {
     if (collapsed && $('.icp-sidebar').contains(document.activeElement)) $('.icp-sidebar-toggle').focus();
     $('.icp-sidebar').hidden = collapsed;
@@ -237,7 +252,8 @@
     state.captionSource = $('.icp-caption-source').value;
     $('.icp-qwen-state').hidden=state.captionSource!=='qwen-cache';$('.icp-subtitle-status').hidden=state.captionSource==='qwen-cache';
     $('.icp-cache-progress').hidden=state.captionSource!=='qwen-cache';
-    $('.icp-cache-auto').hidden=state.captionSource!=='qwen-cache';
+    $('.icp-qwen-settings-group').hidden=state.captionSource!=='qwen-cache';
+    $('.icp-qwen-schedule').hidden=state.captionSource!=='qwen-cache';$('.icp-qwen-budget').hidden=state.captionSource!=='qwen-cache';$('.icp-generate').hidden=state.captionSource!=='qwen-cache';
     $('.icp-qwen-wait-setting').hidden=state.captionSource!=='qwen-cache';
     $('.icp-qwen-retry').textContent='重新载入';$('.icp-qwen-retry').hidden=state.captionSource!=='qwen-cache';
     state.cues = state.captionSource==='qwen-cache' ? state.localCues : state.platformCues;
@@ -613,6 +629,7 @@
   }
   function renderCacheProgress(p){
     const box=$('.icp-cache-progress');box.hidden=state.captionSource!=='qwen-cache';
+    $('.icp-generate').hidden=state.captionSource!=='qwen-cache';$('.icp-generate').textContent=p.wholeCourse?'停止整课生成':'生成整课字幕';
     if(box.hidden)return;
     const complete=p.total>0&&p.completed===p.total;
     if(complete&&!cacheWasComplete)box.open=false;
@@ -851,10 +868,12 @@
       if (Math.abs(video.currentTime - state.lastSaved) >= 5) saveProgress();
     });
     video.addEventListener('pause', () => {
+      if(state.captionSource==='qwen-cache')qwen.tick();
       saveProgress();
       if (!panel.hidden && video.src && !video.error && !video.ended) status('已暂停，可继续播放。');
     });
     video.addEventListener('playing', () => {
+      if(state.captionSource==='qwen-cache')qwen.tick();
       if (panel.hidden) { video.pause(); return; }
       status(state.live ? '正在直播。' : '正在播放。');
     });
