@@ -45,19 +45,54 @@
     return cues;
   }
 
+  const clock=seconds=>{const n=Math.max(0,Math.floor(seconds));return (n>=3600?Math.floor(n/3600)+':':'')+String(Math.floor(n/60)%60).padStart(n>=3600?2:1,'0')+':'+String(n%60).padStart(2,'0');};
+  function failureReason(message){
+    const raw=String(message||'未返回具体错误');
+    if(/无法连接 Qwen 本地服务/.test(raw))return {reason:'无法连接本地服务 127.0.0.1:8768（尚不能确认是未启动、已退出还是连接被阻止）',action:'检查本地服务，再点击「识别与增强 → 重新载入」'};
+    if(/课程音频连接失败/.test(raw))return {reason:'浏览器无法连接课程音频，具体网络原因未确认',action:'检查校园网/VPN和课程登录状态，再重新载入'};
+    if(/密钥/.test(raw))return {reason:'本地服务连接密钥缺失或无效',action:'在「关键词与连接」检查密钥，再重新载入'};
+    if(/HTTP (401|403)/.test(raw))return {reason:'课程服务器拒绝音频访问（'+raw.match(/HTTP (401|403)/)[0]+'）',action:'检查课程登录状态及校园网/VPN，再重新载入'};
+    if(/未完整覆盖/.test(raw))return {reason:'解码音频短于请求窗口，未生成该窗口字幕；具体原因未确认',action:'点击「识别与增强 → 重新载入」重试'};
+    if(/超时|超过 65 秒|timed out/.test(raw))return {reason:'请求超时，未取得完整窗口结果；具体原因未确认',action:'检查本地服务和校园网/VPN，再重新载入'};
+    // Do not expose signed media URLs or infer a cause from an unclassified exception.
+    if(/https?:\/\/|Bearer|token=|key=/i.test(raw))return {reason:'请求失败（具体原因未确认）',action:'检查本地服务和课程连接，再重新载入'};
+    if(/Failed to fetch|NetworkError|fetch failed/i.test(raw))return {reason:'网络请求失败，尚不能确认是本地服务还是课程音频连接',action:'检查本地服务和校园网/VPN，再重新载入'};
+    return {reason:raw,action:'点击「识别与增强 → 重新载入」重试'};
+  }
   class QwenCache {
-    constructor({snapshot,request,onCues,onStatus,onProgress=()=>{},pause,resume,waitLimitMs=5000}) {
-      Object.assign(this,{snapshot,request,onCues,onStatus,onProgress,pause,resume});
+    constructor({snapshot,request,loadSaved,onCues,onStatus,onProgress=()=>{},pause,resume,waitLimitMs=5000}) {
+      Object.assign(this,{snapshot,request,loadSaved,onCues,onStatus,onProgress,pause,resume});
       this.cache=new Map();this.completed=new Set();this.continuous=true;this.epoch=0;this.active=false;this.busy=false;this.waiting=false;this.dirty=false;
       this.waitExpired=false;this.setWaitLimit(waitLimitMs);
     }
+    statusInfo(){
+      const s=this.snapshot(),valid=Number.isFinite(s.time)&&Number.isFinite(s.duration)&&s.duration>0;
+      const currentStart=valid?Math.floor(Math.min(s.time,s.duration-0.001)/20)*20:null;
+      const currentReady=currentStart!==null&&this.cache.has(currentStart);
+      const current=currentReady?'当前位置字幕已缓存（停顿处可能无字幕）':'当前位置字幕未就绪';
+      const window=this.failure?this.failure.start:this.busy?this.requestStart:null;
+      const range=window===null?'':clock(window)+'–'+clock(Math.min(s.duration,window+20));
+      const relation=window===currentStart?'当前窗口':window>currentStart?'后续窗口':'其他窗口';
+      let detail;
+      if(this.blocked)detail=this.blocked;
+      else if(this.failure)detail=relation+' '+range+' 失败：'+this.failure.reason+'；缓存已停止，已有字幕保留。'+this.failure.action;
+      else if(this.busy)detail=relation+' '+range+' · '+this.phase+(this.waitExpired&&!currentReady?'；等待已达上限，播放继续':'');
+      else detail=this.active?(this.completed.size===Math.ceil(s.duration/20)?'全课字幕已缓存':'前方缓存已就绪，整课缓存已关闭'):'缓存已停止';
+      return {text:'Qwen · '+current+' · '+detail,currentReady,failed:Boolean(this.failure),phase:this.phase,window,range};
+    }
+    publishStatus(){
+      const info=this.statusInfo();
+      if(info.text===this.lastStatus&&this.waiting===this.lastWaiting)return;
+      this.lastStatus=info.text;this.lastWaiting=this.waiting;this.onStatus(info.text,this.waiting,info);
+    }
+    setPhase(text){this.phase=text;this.publishStatus();}
     report(){
       const s=this.snapshot(),duration=Number.isFinite(s.duration)&&s.duration>0?s.duration:0;
       const windows=[...this.completed].filter(start=>start<duration).sort((a,b)=>a-b);
       this.onProgress({duration,total:Math.ceil(duration/20),completed:windows.length,windows,
         start:this.busy?this.requestStart:null,end:this.busy?Math.min(duration,this.requestStart+20):null,active:this.active});
     }
-    start(){this.stop();this.waitExpired=false;this.active=true;this.timer=setInterval(()=>this.tick(),500);this.tick();}
+    start(){this.stop();this.failure=null;this.blocked=null;this.loadedSaved=false;this.waitExpired=false;this.active=true;this.timer=setInterval(()=>this.tick(),500);this.tick();}
     stop(){this.active=false;clearInterval(this.timer);this.epoch++;this.controller?.abort();this.controller=null;this.busy=false;this.release();this.report();}
     release(){clearTimeout(this.waitTimer);this.waitTimer=null;if(this.waiting){this.waiting=false;const play=this.wasPlaying;this.wasPlaying=false;if(play)this.resume();}}
     setWaitLimit(ms){
@@ -73,7 +108,7 @@
     expireWait(){
       if(!this.active||!this.waiting)return;
       this.waitExpired=true;this.release();
-      this.onStatus('Qwen · 等待已达上限 · 字幕继续后台准备',false);
+      this.publishStatus();
     }
     setContinuous(enabled){
       this.continuous=Boolean(enabled);
@@ -82,28 +117,46 @@
       if(this.active)this.tick();
     }
     cancelResume(){this.wasPlaying=false;}
-    reset(clear=false){this.epoch++;this.controller?.abort();this.controller=null;this.busy=false;if(clear){this.cache.clear();this.completed.clear();}this.release();this.waitExpired=false;if(this.active)this.tick();else this.report();}
+    reset(clear=false){if(clear){this.failure=null;this.loadedSaved=false;}this.epoch++;this.controller?.abort();this.controller=null;this.busy=false;if(clear){this.cache.clear();this.completed.clear();}this.release();this.waitExpired=false;if(this.active)this.tick();else this.report();}
     tick(){
-      if(!this.active)return;
+      if(!this.active){if(this.failure)this.publishStatus();return;}
       const s=this.snapshot();
-      if(!s.source||!Number.isFinite(s.duration)||s.duration<=0||!Number.isFinite(s.time)||s.time<0||s.time>s.duration||s.live){if(this.busy||this.waiting){this.epoch++;this.controller?.abort();this.busy=false;this.release();}this.report();return this.onStatus('Qwen 缓存仅支持已加载的录播',false);}
-      if(s.rate<0.75||s.rate>2){if(this.busy||this.waiting){this.epoch++;this.controller?.abort();this.busy=false;this.release();}this.report();return this.onStatus('Qwen 缓存支持 0.75×–2×，请调整速度',false);}
-      if(this.source!==s.source){this.release();this.waitExpired=false;this.source=s.source;this.cache.clear();this.completed.clear();}
+      if(!s.source||!Number.isFinite(s.duration)||s.duration<=0||!Number.isFinite(s.time)||s.time<0||s.time>s.duration||s.live){if(this.busy||this.waiting){this.epoch++;this.controller?.abort();this.busy=false;this.release();}this.blocked='未加载有效录播，无法准备字幕；请选择已加载的录播课次';this.report();return this.publishStatus();}
+      if(s.rate<0.75||s.rate>2){if(this.busy||this.waiting){this.epoch++;this.controller?.abort();this.busy=false;this.release();}this.blocked='缓存暂停：当前倍速超出支持范围，请调整到 0.75×–2×';this.report();return this.publishStatus();}
+      this.blocked=null;
+      if(this.source!==s.source){this.release();this.waitExpired=false;this.source=s.source;this.loadedSaved=false;this.cache.clear();this.completed.clear();}
       const start=Math.floor(Math.min(s.time,s.duration-0.001)/20)*20;
       if(this.busy&&!this.cache.has(start)&&this.requestStart!==start){this.epoch++;this.controller?.abort();this.busy=false;this.controller=null;}
 
+      if(this.loadSaved&&!this.loadedSaved&&!this.busy){
+        const epoch=this.epoch,source=s.source,controller=new AbortController();
+        this.controller=controller;this.busy=true;this.requestStart=start;this.phase='正在加载本机已保存的本课字幕';this.report();this.publishStatus();
+        this.loadSaved({source,duration:s.duration},controller.signal).then(result=>{
+          if(!this.active||epoch!==this.epoch||source!==this.snapshot().source)return;
+          if(!Array.isArray(result?.windows))throw Error('本地字幕缓存返回无效');
+          const windows=result.windows.filter(w=>Number.isInteger(w.start)&&w.start>=0&&w.start%20===0&&w.start<s.duration&&w.end===Math.min(s.duration,w.start+20)&&Array.isArray(w.cues));
+          windows.sort((a,b)=>Math.abs(a.start-start)-Math.abs(b.start-start));
+          this.completed=new Set(windows.map(w=>w.start));this.cache=new Map(windows.slice(0,180).map(w=>[w.start,w]));
+          this.loadedSaved=true;this.dirty=true;
+          this.onCues(layout(this.cache.values()));this.dirty=false;
+        }).catch(error=>{
+          if(epoch!==this.epoch||!this.active||error.name==='AbortError')return;
+          this.failure={start,...failureReason(error.message)};this.active=false;clearInterval(this.timer);this.busy=false;this.release();this.report();this.publishStatus();
+        }).finally(()=>{if(epoch===this.epoch){this.busy=false;this.controller=null;if(this.active)this.tick();}});
+        return;
+      }
       const current=this.cache.get(start);
       if(current){this.release();if(this.dirty){this.dirty=false;this.onCues(layout(this.cache.values()));}}
-      if(this.busy)return;
+      if(this.busy){this.publishStatus();return;}
       let target=start;
       while(this.cache.has(target)&&target+20<Math.min(s.duration,s.time+100))target+=20;
       // Keep the near playback horizon ready, then continue through the recording.
       if(this.cache.has(target)){
-        if(!this.continuous){this.report();return this.onStatus('Qwen · 前方字幕已就绪',false);}
+        if(!this.continuous){this.report();return this.publishStatus();}
         target=start;
         while(target<s.duration&&this.completed.has(target))target+=20;
         if(target>=s.duration){target=0;while(target<s.duration&&this.completed.has(target))target+=20;}
-        if(target>=s.duration){this.report();return this.onStatus('Qwen · 全课字幕已缓存 · '+this.completed.size+'/'+Math.ceil(s.duration/20),false);}
+        if(target>=s.duration){this.report();return this.publishStatus();}
       }
 
       const epoch=this.epoch,source=s.source;
@@ -111,8 +164,7 @@
         if(this.waitLimitMs===0)this.waitExpired=true;
         else{this.waiting=true;this.waitStarted=Date.now();this.wasPlaying=!s.paused;if(this.wasPlaying)this.pause();this.armWait();}
       }
-      this.onStatus(!current?(this.waitExpired?'Qwen · 字幕继续后台准备':'Qwen · 正在准备当前位置字幕…'):'Qwen · 缓存 '+this.completed.size+'/'+Math.ceil(s.duration/20)+' · '+Math.floor(target/60)+':'+String(target%60).padStart(2,'0'),this.waiting);
-      this.busy=true;this.requestStart=target;const controller=new AbortController();this.controller=controller;this.report();
+      this.busy=true;this.requestStart=target;this.phase='查询本地字幕缓存';const controller=new AbortController();this.controller=controller;this.report();this.publishStatus();
       this.request({source,start:target,duration:s.duration},controller.signal).then(result=>{
         if(!this.active||epoch!==this.epoch||source!==this.snapshot().source)return;
         if(!result||result.start!==target||!Array.isArray(result.cues))throw Error('Qwen 返回了无效字幕窗口');
@@ -120,7 +172,7 @@
         while(this.cache.size>180){const key=[...this.cache.keys()].filter(k=>k!==start).sort((a,b)=>Math.abs(b-start)-Math.abs(a-start))[0];this.cache.delete(key);}
       }).catch(error=>{
         if(epoch!==this.epoch||!this.active||error.name==='AbortError')return;
-        this.active=false;clearInterval(this.timer);this.busy=false;this.release();this.report();this.onStatus(error.message,false);
+        this.failure={start:target,...failureReason(error.message)};this.active=false;clearInterval(this.timer);this.busy=false;this.release();this.report();this.publishStatus();
       }).finally(()=>{if(epoch===this.epoch){this.busy=false;this.controller=null;if(this.active)this.tick();}});
     }
   }

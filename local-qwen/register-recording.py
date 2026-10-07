@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-spec = importlib.util.spec_from_file_location('service', Path(__file__).with_name('service.py'))
+spec = importlib.util.spec_from_file_location('service', Path(__file__).with_name('recording.py'))
 s = importlib.util.module_from_spec(spec); spec.loader.exec_module(s)
 
 def main():
@@ -15,7 +15,7 @@ def main():
     parser.add_argument('--url-file', required=True, help='包含浏览器视频地址的本地文本文件，不会复制或打印签名')
     parser.add_argument('--file', required=True, help='已获得授权的本地视频或 WAV 音频')
     parser.add_argument('--offset', type=float, default=0, help='裁切片段在原始录播中的起始秒数')
-    parser.add_argument('--state-dir', default=os.environ.get('ICOURSE_WHISPER_HOME', str(Path.home() / 'Library/Application Support/iCourseWhisper')))
+    parser.add_argument('--state-dir', default=os.environ.get('ICOURSE_QWEN_HOME', str(Path.home() / 'Library/Application Support/iCourseQwen')))
     args = parser.parse_args()
     if not 0 <= args.offset <= 86400: parser.error('offset 超出范围')
     source = Path(args.url_file).read_text().strip()

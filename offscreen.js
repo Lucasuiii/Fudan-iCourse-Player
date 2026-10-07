@@ -1,4 +1,4 @@
-/* global ICourseVoice, ICourseWhisperStream */
+/* global ICourseVoice */
 'use strict';
 let session = null;
 let queue = Promise.resolve();
@@ -9,27 +9,11 @@ async function stop() {
   const old = session;
   session = null;
   if (!old) return;
-  old.asr?.close();
   old.stream.getTracks().forEach((track) => track.stop());
   old.graph.disconnect();
   await old.context.close();
 }
-async function configureASR(enabled, clock, engine, courseId, config) {
-  session.asr?.close(); session.asr = null;
-  if (!enabled) return;
-  const owner = session;
-  const asr = new ICourseWhisperStream.WhisperStream(owner.context, owner.source, (event) => {
-    if (session !== owner || owner.asr !== asr) return;
-    void chrome.runtime.sendMessage({ target: 'voice-background', type: 'asr-event', tabId: owner.tabId, event }).catch(() => {});
-  }, courseId, config);
-  owner.asr = asr;
-  owner.clock = clock || owner.clock;
-  if (owner.clock) asr.setClock(owner.clock);
-  void asr.start().then(() => { if (session === owner && owner.asr === asr && owner.clock) asr.setClock(owner.clock); }).catch(error => { if (session === owner && owner.asr === asr) asr.fail(error.message); });
-}
 async function handle(message) {
-  if (message.type === 'clock') { if (session?.tabId === message.tabId) { session.clock = message.clock; session.asr?.setClock(message.clock); } return snapshot(); }
-  if (message.type === 'asr') { if (session?.tabId === message.tabId) await configureASR(message.enabled, message.clock, message.engine, message.courseId, message.config); return snapshot(); }
   if (message.type === 'state') return snapshot();
   if (message.type === 'configure') {
     if (session?.tabId !== message.tabId) throw Error('音频捕获已停止，请重新启用');
@@ -67,9 +51,8 @@ async function handle(message) {
     if (context.state !== 'running') throw new Error('浏览器未能启动音频输出');
     graph.setEnabled(true);
     if (graph.loadDenoiser) await graph.loadDenoiser(chrome.runtime.getURL('vendor/rnnoise-worklet.js'));
-    session = { stream, context, graph, source, clock: message.clock, asr: null, tabId: message.tabId, enabled: true };
+    session = { stream, context, graph, source, tabId: message.tabId, enabled: true };
     graph.setEnabled(true);
-    if (message.asr) await configureASR(true, message.clock, message.engine, message.courseId, message.config);
     stream.getAudioTracks().forEach((track) => track.addEventListener('ended', () => {
       if (session?.stream !== stream) return;
       queue = queue.then(async () => {

@@ -142,33 +142,14 @@ test('a failed output resume stops capture so original tab audio can recover', a
   assert.equal(app.open(), false);
 });
 
-test('background advertises local ASR protocol before capture starts', async () => {
+test('audio state remains available without any recognizer', async () => {
   const app = background();
   const reply = await app.message('state');
-  assert.equal(reply.asrProtocol, 1);
+  assert.equal(reply.asrProtocol, undefined);
   assert.equal(reply.state.active, false);
   assert.equal(app.open(), false);
 });
 
-test('Whisper start does not block clock updates and restarting replaces a failed recognizer', async () => {
- let handler, finish;const sessions=[];
- class Recognizer{constructor(){sessions.push(this);}start(){return new Promise(r=>finish=r);}setClock(c){this.clock=c;}close(){this.closed=true;}fail(){this.closed=true;}}
- const context={state:'running',destination:{},resume:async()=>{},close:async()=>{},createMediaStreamSource:()=>({})};
- const chrome={runtime:{id:'test',onMessage:{addListener:f=>handler=f},sendMessage:async()=>{}}};
- const stream={getAudioTracks:()=>[{addEventListener(){}}],getTracks:()=>[{stop(){}}]};
- vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../offscreen.js'),'utf8'),{chrome,AudioContext:class{constructor(){return context;}},navigator:{mediaDevices:{getUserMedia:async()=>stream}},ICourseVoice:{createVoiceGraph:()=>({setEnabled(){},disconnect(){}})},ICourseWhisperStream:{WhisperStream:Recognizer}});
- const send=(type,fields={})=>new Promise(r=>handler({target:'voice-offscreen',type,tabId:1,...fields},{id:'test'},r));
- const first={epoch:1,time:0,rate:1,paused:false};
- assert.equal((await send('start',{streamId:'x',asr:true,engine:'whisper',clock:first})).ok,true);
- const newer={epoch:2,time:10,rate:2,paused:false};await send('clock',{clock:newer});finish();await tick();assert.deepEqual(sessions[0].clock,newer);
- sessions[0].fail();await send('asr',{enabled:true,engine:'whisper',clock:newer});assert.equal(sessions.length,2);assert.equal(sessions[1].closed,undefined);finish();await tick();await send('stop');
-});
-
-test('capture forwards trusted course configuration only to the extension offscreen page', async () => {
- const a=background();Object.assign(a.ready,{asr:true,courseId:'11'});await a.click();
- const start=a.messages.find(m=>m.type==='start');assert.equal(start.target,'voice-offscreen');assert.equal(start.config.key,'private-key');assert.equal(start.config.prompt,'QR 分解');
- assert.equal(JSON.stringify(a.notices).includes('private-key'),false);assert.equal(JSON.stringify(a.notices).includes('QR 分解'),false);await a.click();
-});
 test('only the owning extension offscreen page can report enhancement fallback', async () => {
  const app=background();await app.click();
  assert.equal(await app.message('enhancement-changed'),null);
@@ -203,4 +184,10 @@ test('offscreen restores and changes controls without changing enhancement bypas
  const next={strength:'standard',level:true,tone:'natural',tail:true};
  assert.equal((await a.message('configure',{tabId:2,settings:next})).ok,false);assert.deepEqual(a.configured(),initial);
  assert.equal((await a.message('configure',{tabId:1,settings:next})).ok,true);assert.deepEqual(a.configured(),next);assert.equal(a.enabled(),false);await a.message('stop',{tabId:1});
+});
+
+test('audio capture ignores obsolete ASR configuration and never forwards a key',async()=>{
+ const a=background();Object.assign(a.ready,{asr:true,engine:'whisper',courseId:'11'});await a.click();
+ const start=a.messages.find(m=>m.type==='start');assert.equal(start.asr,undefined);assert.equal(start.config,undefined);
+ assert.equal(JSON.stringify(a.notices).includes('private-key'),false);await a.click();
 });

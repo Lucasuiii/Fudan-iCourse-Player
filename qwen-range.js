@@ -1,7 +1,9 @@
 /* Browser-authenticated MP4 range transport; never downloads a complete recording. */
 (function(root){
   async function readRange(fetcher,url,start,end,signal,total){
-    const response=await fetcher(url,{credentials:'include',headers:{Range:`bytes=${start}-${end}`},signal});
+    let response;
+    try{response=await fetcher(url,{credentials:'include',headers:{Range:`bytes=${start}-${end}`},signal});}
+    catch(error){if(signal?.aborted||error.name==='AbortError')throw error;throw Error('课程音频连接失败：浏览器未取得响应，具体原因未确认');}
     const fail=async message=>{await response.body?.cancel();const error=Error(message);error.status=response.status;throw error;};
     if(response.status!==206)return fail(response.status===200?'课程服务器未支持分段读取，已停止整段下载':'浏览器分段读取失败：HTTP '+response.status);
     const match=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get('content-range')||'');
