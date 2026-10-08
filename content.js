@@ -20,10 +20,10 @@
   panel.innerHTML = `
     <div class="icp-shell" role="dialog" aria-modal="true" aria-label="Lyue" tabindex="-1">
       <header class="icp-header"><div class="icp-brand"><span class="icp-mark">▶</span><div><small>LYUE${version ? ' · ' + version : ''}</small><h2>Lyue</h2></div></div><button class="icp-sidebar-toggle" type="button" aria-expanded="true" aria-controls="icp-sidebar">收起侧栏</button><button class="icp-close" type="button" title="关闭" aria-label="关闭播放器">×</button></header>
-      <details class="icp-course-switch"><summary>切换课程 / 直播</summary><div class="icp-topbar"><label>课程 ID <input class="icp-course-id" inputmode="numeric" placeholder="从课程网址获取" aria-label="课程 ID"></label><button class="icp-load" type="button">打开课程 <span aria-hidden="true">→</span></button><details class="icp-livebox"><summary>连接直播流</summary><div class="icp-livebar"><label>HLS 直播地址 <input class="icp-live-url" type="url" placeholder="粘贴有权限的 .m3u8 地址" aria-label="HLS 直播地址"></label><button class="icp-live-open" type="button">播放直播</button></div></details></div></details>
+      <details class="icp-course-switch"><summary>切换课程 / 直播</summary><div class="icp-topbar"><label>课程 ID <input class="icp-course-id" inputmode="numeric" placeholder="从课程网址获取" aria-label="课程 ID"></label><button class="icp-load" type="button">打开课程 <span aria-hidden="true">→</span></button><button class="icp-find-live" type="button">查找当前直播</button><details class="icp-livebox"><summary>连接直播流</summary><div class="icp-livebar"><label>HLS 直播地址 <input class="icp-live-url" type="url" placeholder="粘贴有权限的 .m3u8 地址" aria-label="HLS 直播地址"></label><button class="icp-live-open" type="button">播放直播</button></div></details></div></details>
       <div class="icp-statusbar"><p class="icp-status" role="status">在 iCourse 登录后输入课程 ID，或从课程页面自动识别。</p><span class="icp-subtitle-status" role="status">字幕未加载</span><button class="icp-qwen-cancel" type="button" hidden>取消准备</button></div>
       <div class="icp-layout">
-        <aside class="icp-sidebar" id="icp-sidebar"><div class="icp-course"><small>当前课程</small><strong class="icp-course-title">尚未选择课程</strong><span class="icp-teacher"></span><span class="icp-resource-status" role="status"></span><button class="icp-probe-retry" type="button" hidden>重新检查资源</button></div><div class="icp-tabs" role="tablist" aria-label="侧栏"><button class="icp-tab icp-tab-active" type="button" id="icp-tab-lectures" data-tab="lectures" role="tab" aria-controls="icp-pane-lectures" aria-selected="true">课次</button><button class="icp-tab" type="button" id="icp-tab-transcript" data-tab="transcript" role="tab" aria-controls="icp-pane-transcript" tabindex="-1" aria-selected="false">逐句字幕</button></div><div class="icp-lectures-pane" id="icp-pane-lectures" role="tabpanel" aria-labelledby="icp-tab-lectures"><input class="icp-filter" type="search" placeholder="搜索课次" aria-label="搜索课次"><div class="icp-list" aria-label="课次列表"></div></div><div class="icp-transcript-pane" id="icp-pane-transcript" role="tabpanel" aria-labelledby="icp-tab-transcript" hidden><div class="icp-transcript-controls"><input class="icp-transcript-filter" type="search" placeholder="搜索字幕关键词" aria-label="搜索字幕"><div class="icp-export-controls"><select class="icp-export-format" aria-label="字幕导出格式"><option value="srt">SRT</option><option value="vtt">VTT</option></select><button class="icp-generate" type="button" hidden>生成整课字幕</button><button class="icp-export" type="button">导出本课字幕</button></div><label class="icp-follow-label"><input class="icp-follow" type="checkbox" checked> 跟随播放</label></div><p class="icp-transcript-empty">选择课次后读取官方字幕</p><div class="icp-transcript-list"></div></div></aside>
+        <aside class="icp-sidebar" id="icp-sidebar"><div class="icp-course"><small>当前课程</small><strong class="icp-course-title">尚未选择课程</strong><span class="icp-teacher"></span><span class="icp-resource-status" role="status"></span><button class="icp-watch-live" type="button" hidden>● 观看当前直播</button><button class="icp-probe-retry" type="button" hidden>重新检查资源</button></div><div class="icp-tabs" role="tablist" aria-label="侧栏"><button class="icp-tab icp-tab-active" type="button" id="icp-tab-lectures" data-tab="lectures" role="tab" aria-controls="icp-pane-lectures" aria-selected="true">课次</button><button class="icp-tab" type="button" id="icp-tab-transcript" data-tab="transcript" role="tab" aria-controls="icp-pane-transcript" tabindex="-1" aria-selected="false">逐句字幕</button></div><div class="icp-lectures-pane" id="icp-pane-lectures" role="tabpanel" aria-labelledby="icp-tab-lectures"><input class="icp-filter" type="search" placeholder="搜索课次" aria-label="搜索课次"><div class="icp-list" aria-label="课次列表"></div></div><div class="icp-transcript-pane" id="icp-pane-transcript" role="tabpanel" aria-labelledby="icp-tab-transcript" hidden><div class="icp-transcript-controls"><input class="icp-transcript-filter" type="search" placeholder="搜索字幕关键词" aria-label="搜索字幕"><div class="icp-export-controls"><select class="icp-export-format" aria-label="字幕导出格式"><option value="srt">SRT</option><option value="vtt">VTT</option></select><button class="icp-generate" type="button" hidden>生成整课字幕</button><button class="icp-export" type="button">导出本课字幕</button></div><label class="icp-follow-label"><input class="icp-follow" type="checkbox" checked> 跟随播放</label></div><p class="icp-transcript-empty">选择课次后读取官方字幕</p><div class="icp-transcript-list"></div></div></aside>
         <main class="icp-main"><div class="icp-stage"><media-theme-sutro class="icp-theme"><video class="icp-video" slot="media" controls playsinline preload="metadata"></video></media-theme-sutro><div class="icp-local-caption" hidden></div><div class="icp-placeholder"><span>▶</span><strong>选择一节课次，开始观看</strong><small>你的课程 · 更舒服的播放体验</small></div></div>
           <div class="icp-now"><div><small>当前课次</small><strong class="icp-now-title">等待选择课次</strong></div><span class="icp-date"></span></div>
           <div class="icp-tools"><span class="icp-qwen-state" role="status" hidden></span><button class="icp-go-live" type="button" hidden>● 回到直播</button><button class="icp-more-toggle" type="button" aria-expanded="false" aria-controls="icp-more">识别与增强</button><details class="icp-cache-progress" hidden><summary class="icp-cache-count">字幕缓存 0/0</summary><div class="icp-cache-detail"><div class="icp-cache-window"></div><progress class="icp-cache-meter" max="1" value="0" aria-label="整课字幕缓存进度"></progress><div class="icp-cache-map" role="img" aria-label="字幕缓存时间分布"></div><small class="icp-cache-phase" role="status"></small></div></details></div>
@@ -80,6 +80,8 @@
   $('.icp-load').addEventListener('click', loadCourse);
   $('.icp-probe-retry').addEventListener('click', () => { if (state.course && !state.courseLoading) void scanResources(true); });
   $('.icp-live-open').addEventListener('click', playLive);
+  $('.icp-find-live').addEventListener('click', findLive);
+  $('.icp-watch-live').addEventListener('click', findLive);
   input.addEventListener('keydown', (event) => { if (event.key === 'Enter') loadCourse(); });
   filter.addEventListener('input', renderList);
   $('.icp-transcript-filter').addEventListener('input', renderTranscript);
@@ -354,6 +356,7 @@
     state.courseToken += 1;
     cancelProbe();
     state.playController?.abort();
+    state.liveLookupController?.abort();
     state.courseController?.abort();
     $('.icp-load').disabled = false;
     state.courseLoading = false;
@@ -395,6 +398,7 @@
     $('.icp-placeholder').hidden = false;
     $('.icp-now-title').textContent = '等待选择课次';
     $('.icp-date').textContent = '';
+    state.liveLookupController?.abort();
     state.courseController?.abort();
     const controller = new AbortController();
     state.courseController = controller;
@@ -439,6 +443,7 @@
 
   function updateResourceStatus() {
     const lectures = state.course?.lectures || [];
+    $('.icp-watch-live').hidden = !lectures.some(l=>l.resource==='live');
     const ready = lectures.filter((lecture) => ['video', 'live'].includes(lecture.resource)).length;
     const missing = lectures.filter((lecture) => lecture.resource === 'missing').length;
     const unknown = lectures.filter((lecture) => lecture.resource === 'unknown').length;
@@ -510,7 +515,7 @@
       const name = document.createElement('strong');
       name.textContent = lecture.title;
       const meta = document.createElement('span');
-      meta.textContent = lecture.date + (lecture.resource === 'live' ? ' · 直播资源' : ' · 录播资源');
+      meta.textContent = lecture.date + (lecture.resource === 'live' ? ' · 正在直播' : ' · 录播资源');
       const progress = document.createElement('span');
       progress.className = 'icp-progress';
       describeProgress(progress, readProgress(lecture, state.courseId));
@@ -714,7 +719,7 @@
           { course_id: courseId, sub_id: lecture.id }, { allowPartial: true, signal: controller.signal });
       } catch { /* Match the reference client's get-sub-detail fallback. */ }
       if (state.loadToken !== token) return;
-      const activeLive = sub?.data ? (String(sub.data.sub_type || '').includes('live') && ['1', '2'].includes(String(sub.data.sub_status))) : lecture.live;
+      const activeLive = core.liveState(sub,lecture.live);
       if (lecture.live !== activeLive) { lecture.live = activeLive; renderList(); }
       if (sub?.data?.can_watch === false && (activeLive || sub.data.live_url?.output)) {
         throw new Error('平台当前未开放或未授权观看这场直播，请在官方页面检查。');
@@ -754,6 +759,23 @@
     } catch (error) {
       if (state.loadToken === token) status('无法播放：' + error.message, true);
     }
+  }
+
+  async function findLive() {
+    if(state.courseLoading||panel.hidden)return;
+    if(!state.course)return status('请先打开一门课程，再查找当前直播。',true);
+    state.liveLookupController?.abort();
+    const controller=new AbortController(),courseId=state.courseId,loadToken=state.loadToken;
+    state.liveLookupController=controller;
+    $('.icp-find-live').disabled=true;$('.icp-watch-live').disabled=true;
+    status('正在自动查找当前课程的直播地址…');
+    try{
+      const result=await core.findCurrentLive(ctx,courseId,state.course.lectures,{signal:controller.signal});
+      if(controller.signal.aborted||panel.hidden||courseId!==state.courseId||loadToken!==state.loadToken)return;
+      result.lecture.live=true;result.lecture.resource='live';updateResourceStatus();
+      await startLive(result.url,result.lecture);
+    }catch(error){if(!controller.signal.aborted&&courseId===state.courseId&&loadToken===state.loadToken&&!panel.hidden)status('查找直播失败：'+error.message,true);}
+    finally{if(state.liveLookupController===controller){$('.icp-find-live').disabled=false;$('.icp-watch-live').disabled=false;}}
   }
 
   async function playLive() {
@@ -882,7 +904,7 @@
     video.addEventListener('error', () => { if (video.src && !panel.hidden) status('视频加载失败。请检查播放权限或重新选择课次。', true); });
   }
   bindVideoHandlers();
-  window.addEventListener('pagehide', () => { qwen.stop();stopVoice(); cancelProbe(); saveProgress(); state.playController?.abort(); state.courseController?.abort(); });
+  window.addEventListener('pagehide', () => { qwen.stop();stopVoice(); cancelProbe(); saveProgress(); state.playController?.abort(); state.liveLookupController?.abort(); state.courseController?.abort(); });
   document.addEventListener('focusin', (event) => {
     if (!panel.hidden && !panel.contains(event.target)) $('.icp-close').focus();
   });

@@ -132,3 +132,43 @@ test('already-rewritten WebVPN media URLs have the same signature as upstream UR
  assert.equal(new URL(resigned).pathname,new URL(playing).pathname);
  assert.equal(new URL(resigned).searchParams.get('other'),'keep');
 });
+
+test('live metadata with omitted status can use HLS, but recordings and permission checks remain separate',()=>{
+ const c=core();
+ assert.equal(c.liveState({data:{live_url:{output:{m3u8:'https://example.test/live.m3u8'}}}}),true);
+ assert.equal(c.liveState({data:{live_url:{output:{m3u8:'https://example.test/live.m3u8'}},video_list:{a:{preview_url:'https://example.test/a.mp4'}}}}),false);
+});
+test('find live refreshes current lecture metadata and returns source without scanning old recordings',async()=>{
+ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),calls=[];
+ const c=core(async url=>{calls.push(String(url));return {ok:true,json:async()=>({code:0,data:{sub_type:'live',sub_status:1,can_watch:true,live_url:{output:{m3u8:'https://example.test/live.m3u8'}}}})};});
+ const lecture={id:'now',date};const result=await c.findCurrentLive(ctx,'course',[{id:'old',date:'2000-01-01'},lecture]);
+ assert.equal(result.lecture,lecture);assert.match(result.url,/live\.m3u8/);assert.equal(calls.length,1);assert.match(calls[0],/sub_id=now/);
+});
+test('live discovery reports denied access, unready source, network failure and no active live distinctly',async()=>{
+ const lecture={id:'live',live:true};
+ for(const [data,message] of [
+ [{sub_type:'live',sub_status:1,can_watch:false,live_url:{output:{m3u8:'https://example.test/live.m3u8'}}},/不可观看/],
+ [{sub_type:'live',sub_status:1,can_watch:true},/尚未返回/],
+ [{sub_type:'live',sub_status:3},/未找到/]]){
+ const c=core(async()=>({ok:true,json:async()=>({code:0,data})}));await assert.rejects(c.findCurrentLive(ctx,'course',[lecture]),message);
+ }
+ await assert.rejects(core(async()=>{throw Error('offline');}).findCurrentLive(ctx,'course',[lecture]),/读取失败/);
+});
+test('live discovery honors caller cancellation and cannot return a stale source',async()=>{
+ const controller=new AbortController();const c=core(stalledFetch);
+ const p=c.findCurrentLive(ctx,'course',[{id:'live',live:true}],{signal:controller.signal});controller.abort();await assert.rejects(p,{name:'AbortError'});
+});
+
+
+test('live fallback can supply an alternate HLS source without overriding explicit denial',async()=>{
+ const live={sub_type:'live',sub_status:1};
+ for(const [primary,detail,allowed] of [
+ [{...live,can_watch:true},{...live,live_url:{output:{m3u8:'https://example.test/alternate.m3u8'}}},true],
+ [{...live,can_watch:false},{...live,can_watch:true,live_url:{output:{m3u8:'https://example.test/alternate.m3u8'}}},true],
+ [{...live,can_watch:false},{...live,live_url:{output:{m3u8:'https://example.test/alternate.m3u8'}}},false],
+ [{...live,can_watch:true},{...live,can_watch:false,live_url:{output:{m3u8:'https://example.test/alternate.m3u8'}}},false]]){
+ const c=core(async url=>({ok:true,json:async()=>({code:0,data:url.pathname.endsWith('get-sub-detail')?detail:primary})}));
+ const result=c.findCurrentLive(ctx,'course',[{id:'now',live:true}]);
+ if(allowed)assert.match((await result).url,/alternate\.m3u8/);else await assert.rejects(result,/不可观看/);
+ }
+});

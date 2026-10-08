@@ -155,6 +155,48 @@
     return null;
   }
 
+  function liveState(data, fallback = false) {
+    const info=data?.data;
+    if(!info)return fallback;
+    const known=String(info.sub_type || '').includes('live') && ['1','2'].includes(String(info.sub_status));
+    // Some responses omit live type/status; a returned HLS source without a recording is usable.
+    return known || ((!info.sub_type || info.sub_status == null) && Boolean(selectLive(data)) && !selectVideo(data));
+  }
+
+  async function findCurrentLive(ctx, courseId, lectures, options = {}) {
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const candidates=lectures.filter(l=>l.live || l.date===today).sort((a,b)=>Number(Boolean(b.live))-Number(Boolean(a.live)));
+    let denied=false,unready=false,failed=false;
+    for(const lecture of candidates){
+      if(options.signal?.aborted)throw options.signal.reason || new Error('操作已取消');
+      try{
+        const sub=await api(ctx,'/courseapi/v3/portal-home-setting/get-sub-info',{course_id:courseId,sub_id:lecture.id},{...options,allowPartial:true});
+        const active=liveState(sub,lecture.live);
+        if(!active)continue;
+        let blocked=sub.data?.can_watch===false;
+        let url=blocked?null:selectLive(sub);
+        if(!url){
+          try{
+            const detail=await api(ctx,'/courseapi/v3/multi-search/get-sub-detail',{course_id:courseId,sub_id:lecture.id},{...options,allowPartial:true});
+            if(detail.data?.can_watch===false)blocked=true;
+            else if(!blocked || detail.data?.can_watch===true){
+              // A bare URL cannot override an explicit denial from the primary endpoint.
+              if(liveState(detail,active))url=selectLive(detail);
+              if(url)blocked=false;
+            }
+          }catch(error){if(options.signal?.aborted)throw error;failed=true;}
+        }
+        if(url)return {lecture,url};
+        if(blocked){denied=true;continue;}
+        unready=true;
+      }catch(error){if(options.signal?.aborted)throw error;failed=true;}
+    }
+    if(denied)throw new Error('平台接口返回当前直播不可观看；具体原因尚未确认，请在官方页面检查开放状态和课程权限。');
+    if(unready)throw new Error('已发现直播课次，但平台尚未返回可播放的 HLS 地址，请稍后再查找。');
+    if(failed)throw new Error('直播信息读取失败，请检查登录状态及校园网/VPN后重试。');
+    throw new Error('当前课程未找到正在直播且可播放的课次；若刚开课，请稍后再查找。');
+  }
+
   // Inspect platform metadata only; never fetch media or persist signed URLs.
   async function probeLecture(ctx, courseId, lecture, options = {}) {
     const params = { course_id: courseId, sub_id: lecture.id };
@@ -166,7 +208,7 @@
       if (options.signal?.aborted) throw error;
       infoFailed = true;
     }
-    const activeLive = sub?.data ? String(sub.data.sub_type || '').includes('live') && ['1', '2'].includes(String(sub.data.sub_status)) : lecture.live;
+    const activeLive = liveState(sub, lecture.live);
     if (!sub && activeLive) return 'unknown';
     if (sub?.data?.can_watch === false && (activeLive || sub.data.live_url?.output)) return 'missing';
     if (sub && activeLive) {
@@ -253,5 +295,5 @@
     return (await send(type, fields)).state;
   }
 
-  root.ICourseCore = { context, vpnUrl, hlsConfig, courseIdFromUrl, api, parseCourse, hasLectureStarted, selectVideo, selectLive, probeLecture, signVideo, refreshVideo, subtitleCues, subtitleVtt, voiceRequest };
+  root.ICourseCore = { context, vpnUrl, hlsConfig, courseIdFromUrl, api, parseCourse, hasLectureStarted, selectVideo, selectLive, liveState, findCurrentLive, probeLecture, signVideo, refreshVideo, subtitleCues, subtitleVtt, voiceRequest };
 })(globalThis);
