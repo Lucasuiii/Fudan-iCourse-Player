@@ -147,7 +147,7 @@ test('find live refreshes current lecture metadata and returns source without sc
 test('live discovery reports denied access, unready source, network failure and no active live distinctly',async()=>{
  const lecture={id:'live',live:true};
  for(const [data,message] of [
- [{sub_type:'live',sub_status:1,can_watch:false,live_url:{output:{m3u8:'https://example.test/live.m3u8'}}},/未授权/],
+ [{sub_type:'live',sub_status:1,can_watch:false,live_url:{output:{m3u8:'https://example.test/live.m3u8'}}},/不可观看/],
  [{sub_type:'live',sub_status:1,can_watch:true},/尚未返回/],
  [{sub_type:'live',sub_status:3},/未找到/]]){
  const c=core(async()=>({ok:true,json:async()=>({code:0,data})}));await assert.rejects(c.findCurrentLive(ctx,'course',[lecture]),message);
@@ -157,4 +157,18 @@ test('live discovery reports denied access, unready source, network failure and 
 test('live discovery honors caller cancellation and cannot return a stale source',async()=>{
  const controller=new AbortController();const c=core(stalledFetch);
  const p=c.findCurrentLive(ctx,'course',[{id:'live',live:true}],{signal:controller.signal});controller.abort();await assert.rejects(p,{name:'AbortError'});
+});
+
+
+test('live fallback can supply an alternate HLS source without overriding explicit denial',async()=>{
+ const live={sub_type:'live',sub_status:1};
+ for(const [primary,detail,allowed] of [
+ [{...live,can_watch:true},{...live,live_url:{output:{m3u8:'https://example.test/alternate.m3u8'}}},true],
+ [{...live,can_watch:false},{...live,can_watch:true,live_url:{output:{m3u8:'https://example.test/alternate.m3u8'}}},true],
+ [{...live,can_watch:false},{...live,live_url:{output:{m3u8:'https://example.test/alternate.m3u8'}}},false],
+ [{...live,can_watch:true},{...live,can_watch:false,live_url:{output:{m3u8:'https://example.test/alternate.m3u8'}}},false]]){
+ const c=core(async url=>({ok:true,json:async()=>({code:0,data:url.pathname.endsWith('get-sub-detail')?detail:primary})}));
+ const result=c.findCurrentLive(ctx,'course',[{id:'now',live:true}]);
+ if(allowed)assert.match((await result).url,/alternate\.m3u8/);else await assert.rejects(result,/不可观看/);
+ }
 });

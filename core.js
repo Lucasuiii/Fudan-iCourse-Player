@@ -173,13 +173,25 @@
         const sub=await api(ctx,'/courseapi/v3/portal-home-setting/get-sub-info',{course_id:courseId,sub_id:lecture.id},{...options,allowPartial:true});
         const active=liveState(sub,lecture.live);
         if(!active)continue;
-        if(sub.data?.can_watch===false){denied=true;continue;}
-        const url=selectLive(sub);
+        let blocked=sub.data?.can_watch===false;
+        let url=blocked?null:selectLive(sub);
+        if(!url){
+          try{
+            const detail=await api(ctx,'/courseapi/v3/multi-search/get-sub-detail',{course_id:courseId,sub_id:lecture.id},{...options,allowPartial:true});
+            if(detail.data?.can_watch===false)blocked=true;
+            else if(!blocked || detail.data?.can_watch===true){
+              // A bare URL cannot override an explicit denial from the primary endpoint.
+              if(liveState(detail,active))url=selectLive(detail);
+              if(url)blocked=false;
+            }
+          }catch(error){if(options.signal?.aborted)throw error;failed=true;}
+        }
         if(url)return {lecture,url};
+        if(blocked){denied=true;continue;}
         unready=true;
       }catch(error){if(options.signal?.aborted)throw error;failed=true;}
     }
-    if(denied)throw new Error('平台未授权当前账号观看这场直播，请在官方页面检查课程权限。');
+    if(denied)throw new Error('平台接口返回当前直播不可观看；具体原因尚未确认，请在官方页面检查开放状态和课程权限。');
     if(unready)throw new Error('已发现直播课次，但平台尚未返回可播放的 HLS 地址，请稍后再查找。');
     if(failed)throw new Error('直播信息读取失败，请检查登录状态及校园网/VPN后重试。');
     throw new Error('当前课程未找到正在直播且可播放的课次；若刚开课，请稍后再查找。');
