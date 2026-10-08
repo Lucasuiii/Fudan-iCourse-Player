@@ -305,3 +305,7 @@
 #icp-panel .icp-setting-fields{display:grid;gap:8px;padding:0 0 10px}
 #icp-panel .icp-more select{max-width:170px;min-height:30px;font:inherit;font-size:12px;padding:4px 7px}
 #icp-panel .icp-settings-close:focus-visible,#icp-panel .icp-settings-group>summary:focus-visible{outline:2px solid var(--icp-accent);outline-offset:2px}
+
+#icp-panel .icp-find-live,#icp-panel .icp-watch-live{padding:8px 12px;border:1px solid var(--icp-line);border-radius:9px;background:var(--icp-accent-soft);color:var(--icp-accent);font:inherit;font-size:12px;cursor:pointer}
+#icp-panel .icp-watch-live{margin-top:10px;width:100%}
+#icp-panel .icp-find-live:disabled,#icp-panel .icp-watch-live:disabled{opacity:.5;cursor:wait}
